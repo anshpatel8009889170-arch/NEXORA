@@ -28,35 +28,6 @@
   --error: #ef4444;
 }
 
-/* ==========================================================================
-   2. ROYAL IVORY & WARM GOLD (DAY / SUNLIGHT MODE)
-   ========================================================================== */
-html.light,
-[data-theme="light"] {
-  --background: #faf7f2;
-  --foreground: #121212;
-  
-  --card-bg: #ffffff;
-  --card-border: rgba(184, 134, 11, 0.25);
-  --section-alt: #f3ede2;
-  --nav-bg: rgba(250, 247, 242, 0.96);
-  
-  --text-main: #121212;
-  --text-sub: #3f3f46;
-  --text-sub-light: #71717a;
-  --muted: #52525b;
-  
-  --primary: #b8860b;
-  --primary-light: #d4af37;
-  --primary-dark: #8a6405;
-  --secondary: #ede7dc;
-  
-  --glow-color: rgba(184, 134, 11, 0.18);
-  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  --success: #16a34a;
-  --error: #dc2626;
-}
-
 /* Base Body Styles */
 body {
   background-color: var(--background);
@@ -83,33 +54,12 @@ h1, h2, h3, h4, h5, h6 {
   color: #000000;
 }
 
-/* High contrast gold gradient in Day Mode */
-html.light .text-gold-gradient,
-[data-theme="light"] .text-gold-gradient {
-  background: linear-gradient(135deg, #b8860b 0%, #8a6405 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-html.light .bg-gold-gradient,
-[data-theme="light"] .bg-gold-gradient {
-  background: linear-gradient(135deg, #e6c566 0%, #c99b22 100%);
-  color: #000000;
-}
-
-/* Glow effects */
 .gold-glow {
   box-shadow: 0 0 25px var(--glow-color);
 }
 
 .gold-glow-sm {
   box-shadow: 0 0 12px var(--glow-color);
-}
-
-/* Day Mode Card Enhancements */
-html.light [class*="bg-[var(--card-bg)]"],
-[data-theme="light"] [class*="bg-[var(--card-bg)]"] {
-  box-shadow: var(--card-shadow);
 }
 
 /* Typography Helpers */
@@ -122,4 +72,127 @@ html.light [class*="bg-[var(--card-bg)]"],
   font-family: Georgia, serif;
   font-weight: 700;
   color: var(--primary);
+}
+
+/* ==========================================================================
+   2. ROYAL IVORY DAY MODE (BULLETPROOF UNIFIED RULES)
+   ========================================================================== */
+html.light,
+html[data-theme="light"],
+[data-theme="light"],
+.light {
+  --background: #faf7f2 !important;
+  --foreground: #121212 !important;
+  
+  --card-bg: #ffffff !important;
+  --card-border: rgba(184, 134, 11, 0.28) !important;
+  --section-alt: #f3ede2 !important;
+  --nav-bg: rgba(250, 247, 242, 0.96) !important;
+  
+  --text-main: #121212 !important;
+  --text-sub: #3f3f46 !important;
+  --text-sub-light: #71717a !important;
+  --muted: #52525b !important;
+  
+  --primary: #b8860b !important;
+  --primary-light: #d4af37 !important;
+  --primary-dark: #8a6405 !important;
+  --secondary: #ede7dc !important;
+  
+  --glow-color: rgba(184, 134, 11, 0.18) !important;
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Body in Day Mode */
+html.light body,
+[data-theme="light"] body,
+.light body {
+  background-color: #faf7f2 !important;
+  color: #121212 !important;
+}
+
+/* Alternate Sections (Categories, Why Choose Us, Location, etc.) */
+html.light [class*="bg-[var(--section-alt)]"],
+[data-theme="light"] [class*="bg-[var(--section-alt)]"],
+html.light .bg-\[var\(--section-alt\)\],
+[data-theme="light"] .bg-\[var\(--section-alt\)\],
+.light .bg-\[var\(--section-alt\)\] {
+  background-color: #f3ede2 !important;
+}
+
+/* Cards & Containers (Review cards, Category cards, Food cards, Buttons) */
+html.light [class*="bg-[var(--card-bg)]"],
+[data-theme="light"] [class*="bg-[var(--card-bg)]"],
+html.light .bg-\[var\(--card-bg\)\],
+[data-theme="light"] .bg-\[var\(--card-bg\)\],
+.light .bg-\[var\(--card-bg\)\] {
+  background-color: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Card Borders */
+html.light [class*="border-[var(--card-border)]"],
+[data-theme="light"] [class*="border-[var(--card-border)]"],
+html.light .border-\[var\(--card-border\)\],
+[data-theme="light"] .border-\[var\(--card-border\)\],
+.light .border-\[var\(--card-border\)\] {
+  border-color: rgba(184, 134, 11, 0.28) !important;
+}
+
+/* Headings and Main Text */
+html.light [class*="text-[var(--text-main)]"],
+[data-theme="light"] [class*="text-[var(--text-main)]"],
+html.light h1, html.light h2, html.light h3, html.light h4,
+[data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3, [data-theme="light"] h4,
+.light h1, .light h2, .light h3, .light h4 {
+  color: #121212 !important;
+}
+
+/* Paragraphs & Subtitles */
+html.light [class*="text-[var(--text-sub)]"],
+[data-theme="light"] [class*="text-[var(--text-sub)]"],
+html.light p,
+[data-theme="light"] p,
+.light p {
+  color: #3f3f46 !important;
+}
+
+/* Secondary Muted Text */
+html.light [class*="text-[var(--text-sub-light)]"],
+[data-theme="light"] [class*="text-[var(--text-sub-light)]"],
+.light [class*="text-[var(--text-sub-light)]"] {
+  color: #71717a !important;
+}
+
+/* Navbar in Day Mode */
+html.light nav,
+[data-theme="light"] nav,
+.light nav {
+  background-color: rgba(250, 247, 242, 0.96) !important;
+  border-bottom: 1px solid rgba(184, 134, 11, 0.28) !important;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Footer in Day Mode */
+html.light footer,
+[data-theme="light"] footer,
+.light footer {
+  background-color: #f3ede2 !important;
+  border-top: 1px solid rgba(184, 134, 11, 0.28) !important;
+}
+
+/* High contrast gold gradient in Day Mode */
+html.light .text-gold-gradient,
+[data-theme="light"] .text-gold-gradient,
+.light .text-gold-gradient {
+  background: linear-gradient(135deg, #b8860b 0%, #8a6405 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+html.light .bg-gold-gradient,
+[data-theme="light"] .bg-gold-gradient,
+.light .bg-gold-gradient {
+  background: linear-gradient(135deg, #e6c566 0%, #c99b22 100%) !important;
+  color: #000000 !important;
 }

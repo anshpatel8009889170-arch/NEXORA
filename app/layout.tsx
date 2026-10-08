@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+// Theme-synced layout
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ThemeToggle from "@/components/ThemeToggle";
