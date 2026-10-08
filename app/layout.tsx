@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "NEXORA | Fine Dining, Gourmet Cuisine & Lounge",
@@ -16,11 +17,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark scroll-smooth">
-      <body className="min-h-screen flex flex-col bg-[#0a0a0a] text-[#f5f5f0] selection:bg-[#d4af37] selection:text-black">
+    <html lang="en" className="scroll-smooth">
+      <body className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--foreground)] selection:bg-[#d4af37] selection:text-black">
         <Navbar />
         <div className="flex-1 pt-20">{children}</div>
         <Footer />
+        <ThemeToggle />
       </body>
     </html>
   );

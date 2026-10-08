@@ -1,22 +1,51 @@
 @import "tailwindcss";
 
 :root {
-  /* Brand Luxury Palette */
+  /* Default: Obsidian Black Luxury Night Mode */
+  --background: #0a0a0a;
+  --foreground: #f5f5f0;
+  
+  --card-bg: #141414;
+  --card-border: rgba(212, 175, 55, 0.2);
+  --section-alt: #0e0e0e;
+  --nav-bg: rgba(10, 10, 10, 0.92);
+  
+  --text-main: #f5f5f0;
+  --text-sub: rgba(245, 245, 240, 0.72);
+  --text-sub-light: rgba(245, 245, 240, 0.5);
+  --muted: #a1a1aa;
+  
   --primary: #d4af37;
   --primary-light: #f5d77f;
   --primary-dark: #aa8c2c;
   --secondary: #1f1f1f;
   
-  --background: #0a0a0a;
-  --card-bg: #141414;
-  --card-border: rgba(212, 175, 55, 0.18);
-  
-  --foreground: #f5f5f0;
-  --muted: #a1a1aa;
-  
+  --glow-color: rgba(212, 175, 55, 0.25);
   --success: #22c55e;
   --error: #ef4444;
-  --warning: #f59e0b;
+}
+
+[data-theme="light"] {
+  /* Royal Ivory Day Mode (Super High Contrast for Bright Daylight & Sun) */
+  --background: #faf7f2;
+  --foreground: #141414;
+  
+  --card-bg: #ffffff;
+  --card-border: rgba(190, 150, 40, 0.35);
+  --section-alt: #f3efe6;
+  --nav-bg: rgba(250, 247, 242, 0.96);
+  
+  --text-main: #121212;
+  --text-sub: #2d2d30;
+  --text-sub-light: #52525b;
+  --muted: #52525b;
+  
+  --primary: #b8860b;
+  --primary-light: #d4af37;
+  --primary-dark: #8c6608;
+  --secondary: #ebe5d8;
+  
+  --glow-color: rgba(184, 134, 11, 0.2);
 }
 
 body {
@@ -24,6 +53,7 @@ body {
   color: var(--foreground);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Custom luxury gold gradient */
@@ -33,16 +63,34 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+[data-theme="light"] .text-gold-gradient {
+  background: linear-gradient(135deg, #b8860b 0%, #8a6405 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .bg-gold-gradient {
   background: linear-gradient(135deg, #f5d77f 0%, #d4af37 50%, #aa8c2c 100%);
 }
 
+[data-theme="light"] .bg-gold-gradient {
+  background: linear-gradient(135deg, #e6c566 0%, #c99b22 100%);
+}
+
 .gold-glow {
-  box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
+  box-shadow: 0 0 25px var(--glow-color);
 }
 
 .gold-glow-sm {
-  box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+  box-shadow: 0 0 12px var(--glow-color);
+}
+
+/* Toggle light override */
+[data-theme="light"] .dark-theme-toggle {
+  background-color: #ffffff !important;
+  color: #141414 !important;
+  border-color: rgba(190, 150, 40, 0.5) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 /* Typography Helpers */

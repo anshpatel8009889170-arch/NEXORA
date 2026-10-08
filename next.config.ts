@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  devIndicators: false,
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

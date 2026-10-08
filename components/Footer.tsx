@@ -6,7 +6,7 @@ import { Phone, Mail, MapPin, Clock, Globe, MessageCircle } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="bg-[#050505] border-t border-[rgba(212,175,55,0.2)] text-[#f5f5f0]/80 pt-16 pb-12">
+    <footer className="bg-[var(--section-alt)] border-t border-[var(--card-border)] text-[var(--text-sub)] pt-16 pb-12 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           {/* Column 1: Brand & Bio */}
@@ -24,7 +24,7 @@ export default function Footer() {
                 NEXORA
               </span>
             </div>
-            <p className="text-xs leading-relaxed text-[#f5f5f0]/60">
+            <p className="text-xs leading-relaxed text-[var(--text-sub)]">
               Where culinary artistry meets royal hospitality. Experience an unmatchable
               fine-dining journey prepared by our master chefs using the finest ingredients.
             </p>
@@ -33,7 +33,7 @@ export default function Footer() {
                 href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-full bg-[#141414] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
+                className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
                 aria-label="Website"
               >
                 <Globe className="w-4 h-4" />
@@ -42,7 +42,7 @@ export default function Footer() {
                 href="https://wa.me/919876543210"
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-full bg-[#141414] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
+                className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
                 aria-label="WhatsApp"
               >
                 <MessageCircle className="w-4 h-4" />
@@ -77,7 +77,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/admin/login" className="text-[#f5f5f0]/40 hover:text-[#d4af37] transition-colors">
+                <Link href="/admin/login" className="text-[var(--text-sub-light)] hover:text-[#d4af37] transition-colors">
                   Staff / Admin Portal
                 </Link>
               </li>
@@ -89,19 +89,19 @@ export default function Footer() {
             <h3 className="text-xs uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
               Opening Hours
             </h3>
-            <div className="space-y-2 text-xs text-[#f5f5f0]/70">
+            <div className="space-y-2 text-xs text-[var(--text-sub)]">
               <div className="flex items-start gap-2">
                 <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-[#f5f5f0]">Monday — Friday</p>
-                  <p className="text-[11px] text-[#f5f5f0]/60">12:00 PM – 11:30 PM</p>
+                  <p className="font-medium text-[var(--text-main)]">Monday — Friday</p>
+                  <p className="text-[11px] text-[var(--text-sub-light)]">12:00 PM – 11:30 PM</p>
                 </div>
               </div>
               <div className="flex items-start gap-2 pt-2">
                 <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-[#f5f5f0]">Saturday — Sunday</p>
-                  <p className="text-[11px] text-[#f5f5f0]/60">11:30 AM – 12:30 AM</p>
+                  <p className="font-medium text-[var(--text-main)]">Saturday — Sunday</p>
+                  <p className="text-[11px] text-[var(--text-sub-light)]">11:30 AM – 12:30 AM</p>
                 </div>
               </div>
             </div>
@@ -112,7 +112,7 @@ export default function Footer() {
             <h3 className="text-xs uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
               Find Us
             </h3>
-            <div className="space-y-2.5 text-xs text-[#f5f5f0]/70">
+            <div className="space-y-2.5 text-xs text-[var(--text-sub)]">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                 <p>NEXORA Luxury Dining, Connaught Place, New Delhi, India</p>
@@ -130,7 +130,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-6 border-t border-[#d4af37]/15 flex flex-col sm:flex-row items-center justify-between text-[11px] text-[#f5f5f0]/50 gap-3">
+        <div className="mt-12 pt-6 border-t border-[var(--card-border)] flex flex-col sm:flex-row items-center justify-between text-[11px] text-[var(--text-sub-light)] gap-3">
           <p>© 2026 NEXORA Fine Dining. All Rights Reserved.</p>
           <p className="tracking-wide">
             Designed & Engineered with Excellence by{" "}

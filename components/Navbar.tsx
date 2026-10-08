@@ -9,7 +9,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-[rgba(212,175,55,0.2)]">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo & Brand Name */}
@@ -37,31 +37,31 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-8">
             <Link
               href="/"
-              className="text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] transition-colors"
+              className="text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] transition-colors"
             >
               Home
             </Link>
             <Link
               href="/menu"
-              className="text-sm uppercase tracking-widest text-[#f5f5f0]/80 hover:text-[#d4af37] transition-colors"
+              className="text-sm uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
             >
               Menu
             </Link>
             <Link
               href="/menu"
-              className="text-sm uppercase tracking-widest text-[#f5f5f0]/80 hover:text-[#d4af37] transition-colors"
+              className="text-sm uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
             >
               Order Online
             </Link>
             <Link
               href="#about"
-              className="text-sm uppercase tracking-widest text-[#f5f5f0]/80 hover:text-[#d4af37] transition-colors"
+              className="text-sm uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
             >
               About
             </Link>
             <Link
               href="#contact"
-              className="text-sm uppercase tracking-widest text-[#f5f5f0]/80 hover:text-[#d4af37] transition-colors"
+              className="text-sm uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
             >
               Contact
             </Link>
@@ -72,7 +72,7 @@ export default function Navbar() {
             {/* Login Link */}
             <Link
               href="/login"
-              className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[#f5f5f0]/90 hover:text-[#d4af37] transition-colors px-3 py-2"
+              className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--text-main)] hover:text-[#d4af37] transition-colors px-3 py-2"
             >
               <User className="w-4 h-4 text-[#d4af37]" />
               <span>Login</span>
@@ -81,7 +81,7 @@ export default function Navbar() {
             {/* Cart Icon Button */}
             <Link
               href="/cart"
-              className="relative p-2.5 rounded-full bg-[#141414] border border-[#d4af37]/30 hover:border-[#d4af37] hover:gold-glow-sm transition-all"
+              className="relative p-2.5 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/30 hover:border-[#d4af37] hover:gold-glow-sm transition-all"
               aria-label="View Cart"
             >
               <ShoppingBag className="w-5 h-5 text-[#d4af37]" />
@@ -103,7 +103,7 @@ export default function Navbar() {
           <div className="flex md:hidden items-center gap-3">
             <Link
               href="/cart"
-              className="relative p-2.5 rounded-full bg-[#141414] border border-[#d4af37]/30 active:scale-95 transition-transform"
+              className="relative p-2.5 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/30 active:scale-95 transition-transform"
               aria-label="View Cart"
             >
               <ShoppingBag className="w-5 h-5 text-[#d4af37] pointer-events-none" />
@@ -114,7 +114,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
-              className="p-2.5 rounded-xl bg-[#141414] border border-[#d4af37]/40 text-[#d4af37] hover:border-[#d4af37] active:scale-95 transition-all cursor-pointer touch-manipulation select-none flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-[#d4af37]"
+              className="p-2.5 rounded-xl bg-[var(--card-bg)] border border-[#d4af37]/40 text-[#d4af37] hover:border-[#d4af37] active:scale-95 transition-all cursor-pointer touch-manipulation select-none flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-[#d4af37]"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
             >
@@ -130,47 +130,47 @@ export default function Navbar() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0c0c0c]/98 backdrop-blur-xl border-b border-[#d4af37]/30 px-6 py-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+        <div className="md:hidden bg-[var(--background)] backdrop-blur-xl border-b border-[var(--card-border)] px-6 py-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <Link
             href="/"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
           >
             Home
           </Link>
           <Link
             href="/menu"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
           >
             Menu
           </Link>
           <Link
             href="/menu"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
           >
             Order Online
           </Link>
           <Link
             href="#about"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
           >
             About
           </Link>
           <Link
             href="#contact"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
           >
             Contact
           </Link>
-          <div className="pt-4 mt-2 border-t border-[#d4af37]/20 flex items-center justify-between gap-3">
+          <div className="pt-4 mt-2 border-t border-[var(--card-border)] flex items-center justify-between gap-3">
             <Link
               href="/login"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#d4af37] py-2 px-3 rounded-lg hover:bg-[#171717]"
+              className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#d4af37] py-2 px-3 rounded-lg hover:bg-white/5"
             >
               <User className="w-4 h-4 pointer-events-none" />
               <span>Login</span>
