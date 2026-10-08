@@ -260,49 +260,69 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
 
               {/* Actions Section: Quantity & Add to Cart */}
               <div className="space-y-4 pt-4 border-t border-[#d4af37]/15">
+                {/* Unavailable Notice */}
+                {!item.is_available && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                    <span>This dish is currently unavailable at our kitchen and will be introduced soon.</span>
+                  </div>
+                )}
+
                 {/* Quantity Controls */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase tracking-widest text-[var(--text-main)] font-semibold">
-                    Quantity
-                  </span>
-
-                  <div className="flex items-center bg-[var(--background)] border border-[#d4af37]/40 rounded-full px-3 py-1.5 gap-4 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={handleDecrease}
-                      disabled={quantity <= 1}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[#d4af37] hover:bg-[#d4af37]/20 active:scale-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                      aria-label="Decrease quantity"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-
-                    <span className="text-sm font-bold text-[var(--text-main)] min-w-6 text-center select-none">
-                      {quantity}
+                {item.is_available && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-widest text-[var(--text-main)] font-semibold">
+                      Quantity
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={handleIncrease}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[#d4af37] hover:bg-[#d4af37]/20 active:scale-90 transition-all cursor-pointer"
-                      aria-label="Increase quantity"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                    <div className="flex items-center bg-[var(--background)] border border-[#d4af37]/40 rounded-full px-3 py-1.5 gap-4 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={handleDecrease}
+                        disabled={quantity <= 1}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[#d4af37] hover:bg-[#d4af37]/20 active:scale-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
 
-                {/* Large [ ADD TO CART ] Button */}
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  className="w-full py-4 rounded-full text-xs sm:text-sm font-bold uppercase tracking-[0.2em] bg-gold-gradient text-black hover:opacity-90 active:scale-[0.99] transition-all shadow-xl gold-glow flex items-center justify-center gap-3 cursor-pointer touch-manipulation"
-                >
-                  <ShoppingBag className="w-4 h-4" />
-                  <span>
-                    Add To Cart • {formatCurrency(totalPrice)}
-                  </span>
-                </button>
+                      <span className="text-sm font-bold text-[var(--text-main)] min-w-6 text-center select-none">
+                        {quantity}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={handleIncrease}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[#d4af37] hover:bg-[#d4af37]/20 active:scale-90 transition-all cursor-pointer"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Large Action Button */}
+                {!item.is_available ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full py-4 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] bg-[var(--secondary)] text-[var(--text-sub-light)] border border-[var(--card-border)] cursor-not-allowed select-none flex items-center justify-center gap-2"
+                  >
+                    Currently Unavailable (Coming Soon)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    className="w-full py-4 rounded-full text-xs sm:text-sm font-bold uppercase tracking-[0.2em] bg-gold-gradient text-black hover:opacity-90 active:scale-[0.99] transition-all shadow-xl gold-glow flex items-center justify-center gap-3 cursor-pointer touch-manipulation"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>
+                      Add To Cart • {formatCurrency(totalPrice)}
+                    </span>
+                  </button>
+                )}
 
                 {/* Assurance Badges */}
                 <div className="flex items-center justify-center gap-6 pt-2 text-[11px] text-[var(--text-sub)]">

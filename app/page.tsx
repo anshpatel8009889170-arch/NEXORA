@@ -60,7 +60,7 @@ export default function Home() {
         "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=800&q=80",
       is_veg: false,
       is_vegetarian: false,
-      is_available: true,
+      is_available: false,
       is_featured: true,
       spice_level: "mild",
       prep_time_minutes: 25,

@@ -59,12 +59,17 @@ export default function FoodCard({
           </span>
         </div>
 
-        {/* Featured Tag */}
-        {item.is_featured && (
+        {/* Availability / Featured Tag */}
+        {!item.is_available ? (
+          <div className="absolute top-3 right-3 bg-black/85 text-amber-300 border border-amber-400/40 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 backdrop-blur-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>Unavailable</span>
+          </div>
+        ) : item.is_featured ? (
           <div className="absolute top-3 right-3 bg-gold-gradient text-black text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full shadow-md">
             Chef Special
           </div>
-        )}
+        ) : null}
       </Link>
 
       {/* Card Content */}
@@ -115,8 +120,12 @@ export default function FoodCard({
             )}
           </div>
 
-          {/* Add to Cart or Quantity Controls */}
-          {quantityInCart === 0 ? (
+          {/* Add to Cart or Unavailable Controls */}
+          {!item.is_available ? (
+            <span className="px-3 py-1.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[var(--secondary)] text-[var(--text-sub-light)] border border-[var(--card-border)] select-none">
+              Unavailable
+            </span>
+          ) : quantityInCart === 0 ? (
             <button
               type="button"
               onClick={() => onAddToCart && onAddToCart(item)}

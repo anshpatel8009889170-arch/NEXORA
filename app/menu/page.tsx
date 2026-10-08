@@ -234,6 +234,16 @@ export default function MenuPage() {
           )}
         </div>
 
+        {/* Non-Veg Disclaimer Banner */}
+        {dietFilter === "non-veg" && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span>
+              <strong>Notice:</strong> Non-Veg delicacies are currently unavailable at our kitchen. They are previewed below and will be introduced soon!
+            </span>
+          </div>
+        )}
+
         {/* Food Items Grid (Phase 7 Specification) */}
         {filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
