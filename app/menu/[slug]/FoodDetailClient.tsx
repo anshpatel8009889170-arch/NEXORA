@@ -379,7 +379,7 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#121212]/95 backdrop-blur-md text-[#f5f5f0] border border-[#d4af37]/50 px-5 py-3 rounded-full shadow-2xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--card-bg)] text-[var(--text-main)] border border-[#d4af37]/50 px-5 py-3 rounded-full shadow-2xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200">
           <CheckCircle2 className="w-4 h-4 text-[#d4af37]" />
           <span>{toastMessage}</span>
         </div>

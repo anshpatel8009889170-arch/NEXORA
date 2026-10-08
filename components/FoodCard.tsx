@@ -27,9 +27,9 @@ export default function FoodCard({
   const itemLink = `/menu/${item.slug || item.id}`;
 
   return (
-    <div className="group rounded-2xl bg-[#121212] border border-[#d4af37]/20 hover:border-[#d4af37]/60 hover:gold-glow-sm transition-all duration-300 flex flex-col overflow-hidden">
+    <div className="group rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-[#d4af37] hover:gold-glow-sm transition-all duration-300 flex flex-col overflow-hidden shadow-sm">
       {/* Dish Image Container */}
-      <Link href={itemLink} className="relative w-full h-48 sm:h-52 overflow-hidden bg-[#181818] block">
+      <Link href={itemLink} className="relative w-full h-48 sm:h-52 overflow-hidden bg-[var(--secondary)] block">
         <Image
           src={imageSrc}
           alt={item.name}
@@ -39,7 +39,7 @@ export default function FoodCard({
         />
         
         {/* Subtle dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-black/30 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
 
         {/* Veg / Non-Veg Badge */}
         <div className="absolute top-3 left-3 bg-[#0a0a0a]/85 backdrop-blur-md px-2 py-1 rounded-md border border-white/10 flex items-center gap-1.5 shadow-md">
@@ -54,7 +54,7 @@ export default function FoodCard({
               }`}
             />
           </div>
-          <span className="text-[10px] uppercase tracking-wider text-[#f5f5f0]/90 font-medium">
+          <span className="text-[10px] uppercase tracking-wider text-white font-medium">
             {isVeg ? "Veg" : "Non-Veg"}
           </span>
         </div>
@@ -72,20 +72,20 @@ export default function FoodCard({
         <div className="space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <Link href={itemLink} className="block group-hover:text-gold-gradient transition-colors">
-              <h3 className="text-base font-serif font-semibold text-[#f5f5f0] group-hover:text-gold-gradient transition-colors leading-snug">
+              <h3 className="text-base font-serif font-semibold text-[var(--text-main)] group-hover:text-gold-gradient transition-colors leading-snug">
                 {item.name}
               </h3>
             </Link>
           </div>
 
           <Link href={itemLink} className="block">
-            <p className="text-xs text-[#f5f5f0]/65 line-clamp-2 font-light leading-relaxed">
+            <p className="text-xs text-[var(--text-sub)] line-clamp-2 font-light leading-relaxed">
               {item.description}
             </p>
           </Link>
 
           {/* Meta tags: Prep Time / Spice Level */}
-          <div className="flex items-center gap-3 pt-2 text-[11px] text-[#f5f5f0]/50">
+          <div className="flex items-center gap-3 pt-2 text-[11px] text-[var(--text-sub-light)]">
             {item.prep_time_minutes && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3 text-[#d4af37]" />
@@ -102,14 +102,14 @@ export default function FoodCard({
         </div>
 
         {/* Pricing & Add to Cart Action */}
-        <div className="pt-3 border-t border-[#d4af37]/15 flex items-center justify-between gap-3">
+        <div className="pt-3 border-t border-[var(--card-border)] flex items-center justify-between gap-3">
           {/* Price */}
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-serif font-bold text-gold-gradient">
               {formatCurrency(item.discount_price ?? item.price)}
             </span>
             {item.discount_price && (
-              <span className="text-xs text-[#f5f5f0]/40 line-through">
+              <span className="text-xs text-[var(--text-sub-light)] line-through">
                 {formatCurrency(item.price)}
               </span>
             )}
@@ -126,7 +126,7 @@ export default function FoodCard({
               <span>Add</span>
             </button>
           ) : (
-            <div className="flex items-center bg-[#1c1c1c] border border-[#d4af37]/40 rounded-full px-2 py-1 gap-2">
+            <div className="flex items-center bg-[var(--secondary)] border border-[var(--card-border)] rounded-full px-2 py-1 gap-2">
               <button
                 type="button"
                 onClick={() => onDecrement && onDecrement(item)}
@@ -135,7 +135,7 @@ export default function FoodCard({
               >
                 <Minus className="w-3 h-3" />
               </button>
-              <span className="text-xs font-bold text-[#f5f5f0] min-w-4 text-center">
+              <span className="text-xs font-bold text-[var(--text-main)] min-w-4 text-center">
                 {quantityInCart}
               </span>
               <button

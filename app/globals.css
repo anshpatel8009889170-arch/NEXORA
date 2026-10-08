@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   1. DEFAULT THEME: OBSIDIAN BLACK & ROYAL GOLD (NIGHT MODE)
+   ========================================================================== */
 :root {
-  /* Default: Obsidian Black Luxury Night Mode */
   --background: #0a0a0a;
   --foreground: #f5f5f0;
   
@@ -18,19 +20,55 @@
   --primary: #d4af37;
   --primary-light: #f5d77f;
   --primary-dark: #aa8c2c;
-  --secondary: #1f1f1f;
+  --secondary: #1a1a1a;
   
   --glow-color: rgba(212, 175, 55, 0.25);
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   --success: #22c55e;
   --error: #ef4444;
 }
 
+/* ==========================================================================
+   2. ROYAL IVORY & WARM GOLD (DAY / SUNLIGHT MODE)
+   ========================================================================== */
+html.light,
+[data-theme="light"] {
+  --background: #faf7f2;
+  --foreground: #121212;
+  
+  --card-bg: #ffffff;
+  --card-border: rgba(184, 134, 11, 0.25);
+  --section-alt: #f3ede2;
+  --nav-bg: rgba(250, 247, 242, 0.96);
+  
+  --text-main: #121212;
+  --text-sub: #3f3f46;
+  --text-sub-light: #71717a;
+  --muted: #52525b;
+  
+  --primary: #b8860b;
+  --primary-light: #d4af37;
+  --primary-dark: #8a6405;
+  --secondary: #ede7dc;
+  
+  --glow-color: rgba(184, 134, 11, 0.18);
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  --success: #16a34a;
+  --error: #dc2626;
+}
+
+/* Base Body Styles */
 body {
   background-color: var(--background);
-  color: var(--foreground);
+  color: var(--text-main);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   overflow-x: hidden;
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Base Typography */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-main);
 }
 
 /* Custom luxury gold gradient */
@@ -42,14 +80,36 @@ body {
 
 .bg-gold-gradient {
   background: linear-gradient(135deg, #f5d77f 0%, #d4af37 50%, #aa8c2c 100%);
+  color: #000000;
 }
 
+/* High contrast gold gradient in Day Mode */
+html.light .text-gold-gradient,
+[data-theme="light"] .text-gold-gradient {
+  background: linear-gradient(135deg, #b8860b 0%, #8a6405 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+html.light .bg-gold-gradient,
+[data-theme="light"] .bg-gold-gradient {
+  background: linear-gradient(135deg, #e6c566 0%, #c99b22 100%);
+  color: #000000;
+}
+
+/* Glow effects */
 .gold-glow {
   box-shadow: 0 0 25px var(--glow-color);
 }
 
 .gold-glow-sm {
   box-shadow: 0 0 12px var(--glow-color);
+}
+
+/* Day Mode Card Enhancements */
+html.light [class*="bg-[var(--card-bg)]"],
+[data-theme="light"] [class*="bg-[var(--card-bg)]"] {
+  box-shadow: var(--card-shadow);
 }
 
 /* Typography Helpers */
@@ -62,113 +122,4 @@ body {
   font-family: Georgia, serif;
   font-weight: 700;
   color: var(--primary);
-}
-
-/* ==========================================================================
-   ROYAL IVORY DAY MODE (DHOOP / SUNLIGHT MODE HIGH CONTRAST)
-   ========================================================================== */
-
-html.light,
-html.light body,
-[data-theme="light"],
-[data-theme="light"] body {
-  background-color: #faf7f2 !important;
-  color: #121212 !important;
-}
-
-/* Navigation in Day Mode */
-html.light nav,
-[data-theme="light"] nav {
-  background-color: rgba(250, 247, 242, 0.95) !important;
-  border-bottom: 1px solid rgba(190, 150, 40, 0.35) !important;
-  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05) !important;
-}
-
-html.light nav a,
-[data-theme="light"] nav a {
-  color: #1a1a1a !important;
-}
-
-html.light nav a:hover,
-[data-theme="light"] nav a:hover {
-  color: #b8860b !important;
-}
-
-/* Sections & Cards in Day Mode */
-html.light section,
-[data-theme="light"] section {
-  border-color: rgba(190, 150, 40, 0.25) !important;
-}
-
-html.light .bg-\[\#0e0e0e\],
-html.light .bg-\[\#080808\],
-html.light .bg-\[\#050505\],
-html.light section[id="about"],
-[data-theme="light"] .bg-\[\#0e0e0e\],
-[data-theme="light"] .bg-\[\#080808\],
-[data-theme="light"] .bg-\[\#050505\],
-[data-theme="light"] section[id="about"] {
-  background-color: #f3efe6 !important;
-}
-
-html.light .bg-\[\#121212\],
-html.light .bg-\[\#141414\],
-html.light .bg-\[\#141414\]\/60,
-html.light .bg-\[\#141414\]\/90,
-[data-theme="light"] .bg-\[\#121212\],
-[data-theme="light"] .bg-\[\#141414\],
-[data-theme="light"] .bg-\[\#141414\]\/60,
-[data-theme="light"] .bg-\[\#141414\]\/90 {
-  background-color: #ffffff !important;
-  border-color: rgba(190, 150, 40, 0.3) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
-}
-
-/* Headings & Text in Day Mode */
-html.light h1,
-html.light h2,
-html.light h3,
-[data-theme="light"] h1,
-[data-theme="light"] h2,
-[data-theme="light"] h3 {
-  color: #121212 !important;
-}
-
-html.light p,
-[data-theme="light"] p {
-  color: #27272a !important;
-}
-
-/* Luxury Gold Gradients in Day Mode */
-html.light .text-gold-gradient,
-[data-theme="light"] .text-gold-gradient {
-  background: linear-gradient(135deg, #b8860b 0%, #8a6405 100%) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-}
-
-html.light .bg-gold-gradient,
-[data-theme="light"] .bg-gold-gradient {
-  background: linear-gradient(135deg, #e6c566 0%, #c99b22 100%) !important;
-  color: #000000 !important;
-}
-
-/* Footer in Day Mode */
-html.light footer,
-[data-theme="light"] footer {
-  background-color: #eee8dc !important;
-  border-top: 1px solid rgba(190, 150, 40, 0.35) !important;
-  color: #27272a !important;
-}
-
-html.light footer p,
-html.light footer a,
-[data-theme="light"] footer p,
-[data-theme="light"] footer a {
-  color: #3f3f46 !important;
-}
-
-html.light footer a:hover,
-[data-theme="light"] footer a:hover {
-  color: #b8860b !important;
 }
