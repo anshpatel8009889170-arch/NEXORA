@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ThemeToggle from "@/components/ThemeToggle";
+import { CartProvider } from "@/context/CartContext";
 
 export const metadata: Metadata = {
   title: "NEXORA | Fine Dining, Gourmet Cuisine & Lounge",
@@ -19,10 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--foreground)] selection:bg-[#d4af37] selection:text-black">
-        <Navbar />
-        <div className="flex-1 pt-20">{children}</div>
-        <Footer />
-        <ThemeToggle />
+        <CartProvider>
+          <Navbar />
+          <div className="flex-1 pt-20">{children}</div>
+          <Footer />
+          <ThemeToggle />
+        </CartProvider>
       </body>
     </html>
   );
