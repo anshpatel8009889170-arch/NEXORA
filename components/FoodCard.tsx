@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Plus, Minus, Flame, Clock } from "lucide-react";
 import { MenuItem } from "@/types/database";
 import { formatCurrency } from "@/utils/formatters";
@@ -23,11 +24,12 @@ export default function FoodCard({
 }: FoodCardProps) {
   const isVeg = item.is_vegetarian ?? item.is_veg;
   const imageSrc = item.image || item.image_url;
+  const itemLink = `/menu/${item.slug || item.id}`;
 
   return (
     <div className="group rounded-2xl bg-[#121212] border border-[#d4af37]/20 hover:border-[#d4af37]/60 hover:gold-glow-sm transition-all duration-300 flex flex-col overflow-hidden">
       {/* Dish Image Container */}
-      <div className="relative w-full h-48 sm:h-52 overflow-hidden bg-[#181818]">
+      <Link href={itemLink} className="relative w-full h-48 sm:h-52 overflow-hidden bg-[#181818] block">
         <Image
           src={imageSrc}
           alt={item.name}
@@ -63,20 +65,24 @@ export default function FoodCard({
             Chef Special
           </div>
         )}
-      </div>
+      </Link>
 
       {/* Card Content */}
       <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
         <div className="space-y-1.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-base font-serif font-semibold text-[#f5f5f0] group-hover:text-gold-gradient transition-colors leading-snug">
-              {item.name}
-            </h3>
+            <Link href={itemLink} className="block group-hover:text-gold-gradient transition-colors">
+              <h3 className="text-base font-serif font-semibold text-[#f5f5f0] group-hover:text-gold-gradient transition-colors leading-snug">
+                {item.name}
+              </h3>
+            </Link>
           </div>
 
-          <p className="text-xs text-[#f5f5f0]/65 line-clamp-2 font-light leading-relaxed">
-            {item.description}
-          </p>
+          <Link href={itemLink} className="block">
+            <p className="text-xs text-[#f5f5f0]/65 line-clamp-2 font-light leading-relaxed">
+              {item.description}
+            </p>
+          </Link>
 
           {/* Meta tags: Prep Time / Spice Level */}
           <div className="flex items-center gap-3 pt-2 text-[11px] text-[#f5f5f0]/50">

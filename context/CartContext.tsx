@@ -7,7 +7,7 @@ interface CartContextType {
   items: CartItem[];
   totalItems: number;
   subtotal: number;
-  addToCart: (item: MenuItem) => void;
+  addToCart: (item: MenuItem, quantity?: number) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, delta: number) => void;
   clearCart: () => void;
@@ -44,17 +44,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, mounted]);
 
-  const addToCart = (menuItem: MenuItem) => {
+  const addToCart = (menuItem: MenuItem, quantity: number = 1) => {
     setItems((prev) => {
       const existing = prev.find((ci) => ci.menuItem.id === menuItem.id);
       if (existing) {
         return prev.map((ci) =>
           ci.menuItem.id === menuItem.id
-            ? { ...ci, quantity: ci.quantity + 1 }
+            ? { ...ci, quantity: ci.quantity + quantity }
             : ci
         );
       }
-      return [...prev, { menuItem, quantity: 1 }];
+      return [...prev, { menuItem, quantity: Math.max(1, quantity) }];
     });
   };
 
