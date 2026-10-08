@@ -234,18 +234,40 @@ export default function MenuPage() {
           )}
         </div>
 
-        {/* Non-Veg Disclaimer Banner */}
-        {dietFilter === "non-veg" && (
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span>
-              <strong>Notice:</strong> Non-Veg delicacies are currently unavailable at our kitchen. They are previewed below and will be introduced soon!
-            </span>
-          </div>
-        )}
+        {/* If user clicked Non-Veg, show dedicated "Now Unavailable" Section */}
+        {dietFilter === "non-veg" ? (
+          <div className="py-20 sm:py-24 text-center space-y-6 bg-[var(--card-bg)] rounded-3xl border border-[#d4af37]/30 p-8 sm:p-14 shadow-xl max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-200">
+            {/* Red Non-Veg Badge Indicator */}
+            <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto text-red-400 shadow-inner">
+              <div className="w-5 h-5 rounded-sm border border-red-500 flex items-center justify-center p-[2px]">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+              </div>
+            </div>
 
-        {/* Food Items Grid (Phase 7 Specification) */}
-        {filteredItems.length > 0 ? (
+            <div className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.25em] text-red-400 font-semibold">
+                Non-Veg Kitchen Section
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-serif font-bold text-[var(--text-main)]">
+                Now Unavailable
+              </h2>
+            </div>
+
+            <p className="text-sm text-[var(--text-sub)] max-w-md mx-auto leading-relaxed font-light">
+              NEXORA is currently operating exclusively as a 100% Pure Vegetarian royal kitchen. Non-Veg preparations are now unavailable and will be introduced in the future.
+            </p>
+
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={() => setDietFilter("all")}
+                className="px-8 py-3.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"
+              >
+                View Pure Veg Menu
+              </button>
+            </div>
+          </div>
+        ) : filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredItems.map((dish) => {
               const qty = getItemQuantity(dish.id);
@@ -271,7 +293,7 @@ export default function MenuPage() {
               No Culinary Creations Found
             </h3>
             <p className="text-sm text-[var(--text-sub)] max-w-md mx-auto">
-              We couldn&apos;t find any dishes matching your exact filter criteria. Try adjusting your search term or exploring all categories.
+              We couldn&apos;t find any pure veg dishes matching your exact filter criteria. Try adjusting your search term.
             </p>
             <button
               type="button"
