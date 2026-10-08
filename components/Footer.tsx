@@ -39,7 +39,7 @@ export default function Footer() {
                 <Globe className="w-4 h-4" />
               </a>
               <a
-                href="https://wa.me/919876543210"
+                href="https://wa.me/918303890056"
                 target="_blank"
                 rel="noreferrer"
                 className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
@@ -115,15 +115,25 @@ export default function Footer() {
             <div className="space-y-2.5 text-xs text-[var(--text-sub)]">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-                <p>NEXORA Luxury Dining, Connaught Place, New Delhi, India</p>
+                <p>Sathigva, Amauli-Fatehpur Road, Near Uday Marriage lone</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-[#d4af37] shrink-0" />
-                <p>+91 98765 43210</p>
+                <a
+                  href="tel:+918303890056"
+                  className="hover:text-[#d4af37] transition-colors"
+                >
+                  +91 83038 90056
+                </a>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-[#d4af37] shrink-0" />
-                <p>concierge@nexoradining.com</p>
+                <a
+                  href="mailto:concierge@nexoradining.com"
+                  className="hover:text-[#d4af37] transition-colors"
+                >
+                  concierge@nexoradining.com
+                </a>
               </div>
             </div>
           </div>
