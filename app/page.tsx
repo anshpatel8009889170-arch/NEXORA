@@ -295,10 +295,10 @@ export default function Home() {
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-12">
           <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden shadow-2xl shrink-0 gold-glow group-hover:scale-105 transition-all">
             <Image
-              src="/logo.jpg"
+              src="/logo.png"
               alt="NEXORA Insignia"
               fill
-              className="object-cover scale-[1.65] -translate-y-[1.5%]"
+              className="object-cover"
             />
           </div>
           <div className="space-y-5 text-center md:text-left">
@@ -524,10 +524,10 @@ export default function Home() {
             <div className="p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl text-center space-y-6 gold-glow-sm">
               <div className="relative w-32 h-32 mx-auto rounded-full overflow-hidden shadow-2xl">
                 <Image
-                  src="/logo.jpg"
+                  src="/logo.png"
                   alt="NEXORA Insignia"
                   fill
-                  className="object-cover scale-[1.65] -translate-y-[1.5%]"
+                  className="object-cover"
                 />
               </div>
 

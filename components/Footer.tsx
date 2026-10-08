@@ -12,9 +12,9 @@ export default function Footer() {
           {/* Column 1: Brand & Bio */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-[#d4af37]/40">
+              <div className="relative w-10 h-10 rounded-full overflow-hidden shadow-md">
                 <Image
-                  src="/logo.jpg"
+                  src="/logo.png"
                   alt="NEXORA Logo"
                   fill
                   className="object-cover"

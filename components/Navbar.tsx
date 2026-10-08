@@ -18,10 +18,10 @@ export default function Navbar() {
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-12 h-12 rounded-full overflow-hidden shadow-md group-hover:scale-105 transition-all duration-300">
               <Image
-                src="/logo.jpg"
+                src="/logo.png"
                 alt="NEXORA Logo"
                 fill
-                className="object-cover scale-[1.65] -translate-y-[1.5%]"
+                className="object-cover"
                 priority
               />
             </div>
