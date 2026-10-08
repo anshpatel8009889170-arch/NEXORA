@@ -103,19 +103,26 @@ export default function Navbar() {
           <div className="flex md:hidden items-center gap-3">
             <Link
               href="/cart"
-              className="relative p-2 rounded-full bg-[#141414] border border-[#d4af37]/30"
+              className="relative p-2.5 rounded-full bg-[#141414] border border-[#d4af37]/30 active:scale-95 transition-transform"
+              aria-label="View Cart"
             >
-              <ShoppingBag className="w-5 h-5 text-[#d4af37]" />
-              <span className="absolute -top-1 -right-1 bg-[#d4af37] text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+              <ShoppingBag className="w-5 h-5 text-[#d4af37] pointer-events-none" />
+              <span className="absolute -top-1 -right-1 bg-[#d4af37] text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center pointer-events-none">
                 0
               </span>
             </Link>
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-[#d4af37] focus:outline-none"
-              aria-label="Toggle menu"
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="p-2.5 rounded-xl bg-[#141414] border border-[#d4af37]/40 text-[#d4af37] hover:border-[#d4af37] active:scale-95 transition-all cursor-pointer touch-manipulation select-none flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-[#d4af37]"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 pointer-events-none text-[#d4af37]" />
+              ) : (
+                <Menu className="w-6 h-6 pointer-events-none text-[#d4af37]" />
+              )}
             </button>
           </div>
         </div>
@@ -123,55 +130,55 @@ export default function Navbar() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0e0e0e] border-b border-[#d4af37]/20 px-6 py-6 space-y-4">
+        <div className="md:hidden bg-[#0c0c0c]/98 backdrop-blur-xl border-b border-[#d4af37]/30 px-6 py-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <Link
             href="/"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37]"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
           >
             Home
           </Link>
           <Link
             href="/menu"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37]"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
           >
             Menu
           </Link>
           <Link
             href="/menu"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37]"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
           >
             Order Online
           </Link>
           <Link
             href="#about"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37]"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
           >
             About
           </Link>
           <Link
             href="#contact"
             onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37]"
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[#f5f5f0] hover:text-[#d4af37] hover:bg-[#171717] transition-all"
           >
             Contact
           </Link>
-          <div className="pt-4 border-t border-[#d4af37]/15 flex items-center justify-between">
+          <div className="pt-4 mt-2 border-t border-[#d4af37]/20 flex items-center justify-between gap-3">
             <Link
               href="/login"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 text-sm text-[#d4af37]"
+              className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#d4af37] py-2 px-3 rounded-lg hover:bg-[#171717]"
             >
-              <User className="w-4 h-4" />
-              <span>Login / Account</span>
+              <User className="w-4 h-4 pointer-events-none" />
+              <span>Login</span>
             </Link>
             <Link
               href="/menu"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black"
+              className="px-5 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all text-center"
             >
               Order Now
             </Link>
