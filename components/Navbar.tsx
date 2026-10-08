@@ -36,10 +36,16 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-7">
+            <Link
+              href="/"
+              className="text-xs uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] transition-colors"
+            >
+              Home
+            </Link>
             <Link
               href="/menu"
-              className="text-xs uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] transition-colors"
+              className="text-xs uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
             >
               Menu
             </Link>
@@ -137,6 +143,13 @@ export default function Navbar() {
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-[var(--background)] backdrop-blur-xl border-b border-[var(--card-border)] px-6 py-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+          <Link
+            href="/"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
+          >
+            Home
+          </Link>
           <Link
             href="/menu"
             onClick={() => setMobileMenuOpen(false)}
