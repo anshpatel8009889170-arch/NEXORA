@@ -71,12 +71,6 @@ export default function Navbar() {
                 <span>50%</span>
               </span>
             </Link>
-            <Link
-              href="#contact"
-              className="text-xs uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
-            >
-              Contact
-            </Link>
           </div>
 
           {/* Desktop Right Action Icons & Buttons */}
@@ -180,13 +174,6 @@ export default function Navbar() {
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/40">
               50% OFF
             </span>
-          </Link>
-          <Link
-            href="#contact"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
-          >
-            Contact
           </Link>
           <div className="pt-4 mt-2 border-t border-[var(--card-border)] flex items-center justify-between gap-3">
             <Link

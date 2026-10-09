@@ -1,13 +1,10 @@
 import React from "react";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { UtensilsCrossed, ArrowLeft } from "lucide-react";
 
 export default function FoodNotFound() {
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col">
-      <Navbar />
 
       <main className="flex-1 flex items-center justify-center px-4 py-32">
         <div className="max-w-md w-full text-center space-y-6 bg-[var(--card-bg)] border border-[#d4af37]/30 rounded-3xl p-8 sm:p-10 shadow-2xl">
@@ -39,8 +36,6 @@ export default function FoodNotFound() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

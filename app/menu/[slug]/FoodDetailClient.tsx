@@ -4,8 +4,6 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import FoodCard from "@/components/FoodCard";
 import { useCart } from "@/context/CartContext";
 import { MenuItem } from "@/types/database";
@@ -80,9 +78,8 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col selection:bg-[#d4af37]/30 selection:text-white">
-      <Navbar />
 
-      <main className="flex-1 pt-28 sm:pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 pt-28 sm:pt-12 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         {/* Breadcrumb & Navigation */}
         <div className="flex items-center justify-between py-4 text-xs text-[var(--text-sub)]">
           <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
@@ -404,8 +401,6 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
           <span>{toastMessage}</span>
         </div>
       )}
-
-      <Footer />
     </div>
   );
 }

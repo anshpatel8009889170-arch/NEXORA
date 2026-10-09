@@ -2,8 +2,6 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import FoodCard from "@/components/FoodCard";
 import { useCart } from "@/context/CartContext";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
@@ -92,10 +90,9 @@ export default function MenuPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col selection:bg-[#d4af37]/30 selection:text-white">
-      <Navbar />
 
       {/* Hero / Page Header */}
-      <header className="relative pt-32 pb-16 px-4 sm:px-6 lg:px-8 border-b border-[#d4af37]/15 overflow-hidden">
+      <header className="relative pt-12 pb-16 px-4 sm:px-6 lg:px-8 border-b border-[#d4af37]/15 overflow-hidden">
         {/* Subtle radial background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-b from-[#d4af37]/10 via-[#d4af37]/5 to-transparent blur-3xl pointer-events-none rounded-full" />
 
@@ -336,8 +333,6 @@ export default function MenuPage() {
           <span>{toastMessage}</span>
         </div>
       )}
-
-      <Footer />
     </div>
   );
 }
