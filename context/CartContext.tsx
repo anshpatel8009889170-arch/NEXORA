@@ -3,46 +3,86 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { MenuItem, CartItem } from "@/types/database";
 
+export interface AppliedCoupon {
+  code: string;
+  discountType: "flat" | "percentage";
+  discountValue: number;
+  minOrder?: number;
+}
+
 interface CartContextType {
   items: CartItem[];
   totalItems: number;
   subtotal: number;
+  deliveryFee: number;
+  discountAmount: number;
+  grandTotal: number;
+  appliedCoupon: AppliedCoupon | null;
+  applyCoupon: (coupon: AppliedCoupon) => boolean;
+  removeCoupon: () => void;
   addToCart: (item: MenuItem, quantity?: number) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, delta: number) => void;
   clearCart: () => void;
   getItemQuantity: (itemId: string) => number;
+  isLoaded: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load cart from localStorage on mount
+  // 1. Load cart and coupon from localStorage on initial mount
   useEffect(() => {
-    setMounted(true);
     try {
-      const saved = localStorage.getItem("nexora-cart");
-      if (saved) {
-        setItems(JSON.parse(saved));
+      const savedCart = localStorage.getItem("nexora-cart");
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        if (Array.isArray(parsed)) {
+          setItems(parsed);
+        }
+      }
+
+      const savedCoupon = localStorage.getItem("nexora-coupon");
+      if (savedCoupon) {
+        const parsedCoupon = JSON.parse(savedCoupon);
+        if (parsedCoupon && parsedCoupon.code) {
+          setAppliedCoupon(parsedCoupon);
+        }
       }
     } catch (e) {
       console.error("Failed to load cart from localStorage", e);
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
-  // Save cart to localStorage on update
+  // 2. Persist cart items whenever they change (ONLY after initial load is done)
   useEffect(() => {
-    if (mounted) {
-      try {
-        localStorage.setItem("nexora-cart", JSON.stringify(items));
-      } catch (e) {
-        console.error("Failed to save cart to localStorage", e);
-      }
+    if (!isLoaded) return;
+    try {
+      localStorage.setItem("nexora-cart", JSON.stringify(items));
+    } catch (e) {
+      console.error("Failed to save cart to localStorage", e);
     }
-  }, [items, mounted]);
+  }, [items, isLoaded]);
+
+  // 3. Persist applied coupon whenever it changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      if (appliedCoupon) {
+        localStorage.setItem("nexora-coupon", JSON.stringify(appliedCoupon));
+      } else {
+        localStorage.removeItem("nexora-coupon");
+      }
+    } catch (e) {
+      console.error("Failed to save coupon to localStorage", e);
+    }
+  }, [appliedCoupon, isLoaded]);
 
   const addToCart = (menuItem: MenuItem, quantity: number = 1) => {
     setItems((prev) => {
@@ -78,11 +118,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => {
     setItems([]);
+    setAppliedCoupon(null);
   };
 
   const getItemQuantity = (itemId: string) => {
     const found = items.find((ci) => ci.menuItem.id === itemId);
     return found ? found.quantity : 0;
+  };
+
+  const applyCoupon = (coupon: AppliedCoupon): boolean => {
+    if (subtotal < (coupon.minOrder || 0)) {
+      return false;
+    }
+    setAppliedCoupon(coupon);
+    return true;
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
   };
 
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0);
@@ -92,17 +145,44 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return sum + price * ci.quantity;
   }, 0);
 
+  // Delivery fee: Flat ₹40 when cart has items (as specified in user requirements)
+  const deliveryFee = items.length > 0 ? 40 : 0;
+
+  // Calculate discount amount
+  let discountAmount = 0;
+  if (appliedCoupon && items.length > 0) {
+    if (subtotal >= (appliedCoupon.minOrder || 0)) {
+      if (appliedCoupon.discountType === "percentage") {
+        discountAmount = Math.round((subtotal * appliedCoupon.discountValue) / 100);
+      } else {
+        discountAmount = appliedCoupon.discountValue;
+      }
+      // Ensure discount doesn't exceed subtotal
+      discountAmount = Math.min(discountAmount, subtotal);
+    }
+  }
+
+  // Grand Total: Subtotal - Discount + Delivery
+  const grandTotal = items.length > 0 ? Math.max(0, subtotal - discountAmount + deliveryFee) : 0;
+
   return (
     <CartContext.Provider
       value={{
         items,
         totalItems,
         subtotal,
+        deliveryFee,
+        discountAmount,
+        grandTotal,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
         getItemQuantity,
+        isLoaded,
       }}
     >
       {children}
