@@ -13,6 +13,7 @@ import {
   Clock,
   MapPin,
   Phone,
+  Mail,
   MessageCircle,
   Award,
 } from "lucide-react";
@@ -458,6 +459,21 @@ export default function Home() {
                       className="text-xs text-[#d4af37] hover:underline mt-0.5 inline-block"
                     >
                       +91 83038 90056
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-[#d4af37] shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs uppercase tracking-wider text-[var(--text-main)] font-semibold">
+                      Email Concierge
+                    </h4>
+                    <a
+                      href="mailto:vaibhavpatel8543@gmail.com"
+                      className="text-xs text-[#d4af37] hover:underline mt-0.5 inline-block"
+                    >
+                      vaibhavpatel8543@gmail.com
                     </a>
                   </div>
                 </div>
