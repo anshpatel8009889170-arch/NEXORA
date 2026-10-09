@@ -115,7 +115,7 @@ export default function Footer() {
             <div className="space-y-2.5 text-xs text-[var(--text-sub)]">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-                <p>Sathigva, Amauli-Fatehpur Road, Near Uday Marriage lone</p>
+                <p>Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-[#d4af37] shrink-0" />

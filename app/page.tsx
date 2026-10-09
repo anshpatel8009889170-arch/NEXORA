@@ -427,7 +427,7 @@ export default function Home() {
                       Restaurant Address
                     </h4>
                     <p className="text-xs text-[var(--text-sub)] mt-0.5">
-                      Sathigva, Amauli-Fatehpur Road, Near Uday Marriage lone
+                      Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra
                     </p>
                   </div>
                 </div>
@@ -492,7 +492,7 @@ export default function Home() {
                   NEXORA Fine Dining & Lounge
                 </h3>
                 <p className="text-xs text-[var(--text-sub)]">
-                  Amauli-Fatehpur Road, Near Uday Marriage lone, Sathigva
+                  Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra, Sathigva
                 </p>
               </div>
 
