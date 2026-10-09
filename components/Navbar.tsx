@@ -62,14 +62,11 @@ export default function Navbar() {
               About
             </Link>
             <Link
-              href="/#offers"
+              href="/offers"
               className="text-xs uppercase tracking-widest text-[var(--text-sub)] hover:text-[#d4af37] transition-colors flex items-center gap-1.5"
             >
+              <Sparkles className="w-3 h-3 text-[#d4af37]" />
               <span>Offers</span>
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/40 flex items-center gap-0.5">
-                <Sparkles className="w-2.5 h-2.5" />
-                <span>50%</span>
-              </span>
             </Link>
           </div>
 
@@ -166,13 +163,13 @@ export default function Navbar() {
             About
           </Link>
           <Link
-            href="/#offers"
+            href="/offers"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center justify-between py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
           >
-            <span>Offers</span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/40">
-              50% OFF
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#d4af37]" />
+              <span>Offers</span>
             </span>
           </Link>
           <div className="pt-4 mt-2 border-t border-[var(--card-border)] flex items-center justify-between gap-3">
