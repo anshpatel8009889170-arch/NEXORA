@@ -11,6 +11,34 @@ export interface DeliveryAddressData {
   pincode?: string;
 }
 
+export interface SavedAddress {
+  id: string;
+  type: "Home" | "Work" | "Other";
+  street: string;
+  landmark?: string;
+  city: string;
+  pincode?: string;
+}
+
+const initialSavedAddresses: SavedAddress[] = [
+  {
+    id: "addr_home",
+    type: "Home",
+    street: "Near Ankit Internet Cafe And Janseva Kendra",
+    landmark: "Sathigva Road",
+    city: "Amauli - Fatehpur",
+    pincode: "212631",
+  },
+  {
+    id: "addr_work",
+    type: "Work",
+    street: "Main Market Commercial Plaza",
+    landmark: "Amauli Road",
+    city: "Amauli - Fatehpur",
+    pincode: "212631",
+  },
+];
+
 interface AuthUser {
   id: string;
   phone?: string;
@@ -23,6 +51,10 @@ interface AuthContextType {
   isLoading: boolean;
   isLoggedIn: boolean;
   deliveryAddress: DeliveryAddressData | null;
+  savedAddresses: SavedAddress[];
+  selectedAddressId: string;
+  setSelectedAddressId: (id: string) => void;
+  addSavedAddress: (address: Omit<SavedAddress, "id">) => SavedAddress;
   sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; mockOtp?: string }>;
   verifyOtp: (phone: string, token: string) => Promise<{ success: boolean; message?: string; isNewUser?: boolean }>;
   updateProfileName: (fullName: string) => Promise<{ success: boolean; message?: string }>;
@@ -36,16 +68,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressData | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>(initialSavedAddresses);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("addr_home");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user and profile on initial mount
+  // Load user, profile and saved addresses on initial mount
   useEffect(() => {
     async function initAuth() {
       try {
-        // 1. Check local cached session first for instant UI response
+        // 1. Check local cached session first
         const cachedUser = localStorage.getItem("nexora-user");
         const cachedProfile = localStorage.getItem("nexora-profile");
         const cachedAddress = localStorage.getItem("nexora-address");
+        const cachedSavedAddresses = localStorage.getItem("nexora-saved-addresses");
+        const cachedSelectedAddressId = localStorage.getItem("nexora-selected-address-id");
 
         if (cachedUser) {
           try {
@@ -61,6 +97,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             setDeliveryAddress(JSON.parse(cachedAddress));
           } catch {}
+        }
+        if (cachedSavedAddresses) {
+          try {
+            const parsed = JSON.parse(cachedSavedAddresses);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSavedAddresses(parsed);
+            }
+          } catch {}
+        }
+        if (cachedSelectedAddressId) {
+          setSelectedAddressId(cachedSelectedAddressId);
         }
 
         // 2. Synchronize with Supabase Auth session
@@ -114,7 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(u);
         localStorage.setItem("nexora-user", JSON.stringify(u));
 
-        // Fetch or create profile
         const { data: profileData } = await supabase
           .from("profiles")
           .select("*")
@@ -126,8 +172,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem("nexora-profile", JSON.stringify(profileData));
         }
       } else {
-        // If logged out from Supabase and not in local guest mode
-        // Note: Keep state if user logged in via verified demo session
         const cachedUser = localStorage.getItem("nexora-user");
         if (!cachedUser) {
           setUser(null);
@@ -140,6 +184,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Update selected address ID
+  const handleSelectAddressId = (id: string) => {
+    setSelectedAddressId(id);
+    localStorage.setItem("nexora-selected-address-id", id);
+  };
+
+  // Add new saved address
+  const addSavedAddress = (address: Omit<SavedAddress, "id">): SavedAddress => {
+    const newAddr: SavedAddress = {
+      ...address,
+      id: `addr_${Date.now()}`,
+    };
+    const updated = [...savedAddresses, newAddr];
+    setSavedAddresses(updated);
+    setSelectedAddressId(newAddr.id);
+    localStorage.setItem("nexora-saved-addresses", JSON.stringify(updated));
+    localStorage.setItem("nexora-selected-address-id", newAddr.id);
+    return newAddr;
+  };
 
   // Send OTP to phone
   const sendOtp = async (phoneNumber: string): Promise<{ success: boolean; message?: string; mockOtp?: string }> => {
@@ -156,9 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        // Supabase phone provider might not be configured in project settings yet
         console.warn("Supabase SMS provider notice:", error.message);
-        // Fallback demo OTP so testing and development never gets blocked
         return {
           success: true,
           message: "Verification code generated! (Use demo code 123456)",
@@ -203,7 +265,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(authUser);
         localStorage.setItem("nexora-user", JSON.stringify(authUser));
 
-        // Check profile
         const { data: existingProfile } = await supabase
           .from("profiles")
           .select("*")
@@ -215,7 +276,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem("nexora-profile", JSON.stringify(existingProfile));
           return { success: true, isNewUser: false };
         } else {
-          // New profile needed
           const newProfile: Profile = {
             id: data.user.id,
             full_name: "",
@@ -239,7 +299,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(authUser);
         localStorage.setItem("nexora-user", JSON.stringify(authUser));
 
-        // Check if cached profile exists
         const cachedProfile = localStorage.getItem(`nexora-profile-${cleaned}`);
         if (cachedProfile) {
           const parsed = JSON.parse(cachedProfile);
@@ -265,7 +324,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         message: error?.message || "Invalid OTP entered. Please try again or use 123456.",
       };
     } catch (err: unknown) {
-      // Check fallback code
       if (token.trim() === "123456") {
         const fallbackId = `user_${cleaned}`;
         const authUser: AuthUser = { id: fallbackId, phone: formattedPhone };
@@ -318,7 +376,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(`nexora-profile-${cleaned}`, JSON.stringify(updatedProfile));
       }
 
-      // Sync with Supabase profiles table
       try {
         await supabase.from("profiles").upsert({
           id: user.id,
@@ -375,6 +432,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isLoggedIn: !!user && !!profile?.full_name,
         deliveryAddress,
+        savedAddresses,
+        selectedAddressId,
+        setSelectedAddressId: handleSelectAddressId,
+        addSavedAddress,
         sendOtp,
         verifyOtp,
         updateProfileName,
