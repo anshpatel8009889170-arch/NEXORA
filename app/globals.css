@@ -45,6 +45,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Custom luxury gold gradient */
 .text-gold-gradient {
   background: linear-gradient(135deg, #f5d77f 0%, #d4af37 50%, #aa8c2c 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -186,6 +187,7 @@ html.light .text-gold-gradient,
 [data-theme="light"] .text-gold-gradient,
 .light .text-gold-gradient {
   background: linear-gradient(135deg, #b8860b 0%, #8a6405 100%) !important;
+  background-clip: text !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
 }
