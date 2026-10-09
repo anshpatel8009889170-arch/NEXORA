@@ -289,44 +289,6 @@ export default function Home() {
       </section>
 
       {/* ===================================================================
-          4. ABOUT RESTAURANT (HERITAGE & STORY)
-          =================================================================== */}
-      <section id="about" className="py-24 px-4 sm:px-6 lg:px-8 border-b border-[var(--card-border)]">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-12">
-          <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden shadow-2xl shrink-0 gold-glow group-hover:scale-105 transition-all">
-            <Image
-              src="/logo.png"
-              alt="NEXORA Insignia"
-              fill
-              className="object-cover"
-            />
-          </div>
-          <div className="space-y-5 text-center md:text-left">
-            <span className="text-xs uppercase tracking-[0.3em] text-[#d4af37] font-semibold">
-              The NEXORA Heritage
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[var(--text-main)]">
-              Dining Transcended Into High Art
-            </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-sub)] leading-relaxed font-light">
-              NEXORA was born out of a deep reverence for classical culinary gastronomy and
-              progressive luxury dining. From our signature charcoal-grilled preparations to
-              our delicate 24K edible gold desserts, every plate is an exquisite celebration of flavor, texture, and elegance.
-            </p>
-            <div className="pt-2">
-              <Link
-                href="/menu"
-                className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[#d4af37] hover:underline"
-              >
-                <span>Read our culinary philosophy</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===================================================================
           5. WHY CHOOSE US (PILLARS)
           =================================================================== */}
       <section className="py-20 bg-[var(--section-alt)] border-b border-[var(--card-border)] transition-colors">
@@ -511,12 +473,6 @@ export default function Home() {
                   <MessageCircle className="w-4 h-4" />
                   <span>Chat on WhatsApp</span>
                 </a>
-                <Link
-                  href="/menu"
-                  className="px-6 py-3 rounded-full text-xs font-semibold uppercase tracking-wider bg-[var(--card-bg)] text-[var(--text-main)] border border-[#d4af37]/40 hover:border-[#d4af37] active:scale-95 transition-all"
-                >
-                  Reserve A Table
-                </Link>
               </div>
             </div>
 
