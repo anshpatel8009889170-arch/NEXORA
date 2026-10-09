@@ -5,10 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { ShoppingBag, Menu, X, User, Sparkles } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { totalItems } = useCart();
+  const { isLoggedIn, profile } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] transition-colors duration-200">
@@ -72,13 +74,13 @@ export default function Navbar() {
 
           {/* Desktop Right Action Icons & Buttons */}
           <div className="hidden md:flex items-center gap-5">
-            {/* Login Link */}
+            {/* Login / Profile Link */}
             <Link
               href="/login"
               className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--text-main)] hover:text-[#d4af37] transition-colors px-2 py-1.5"
             >
               <User className="w-4 h-4 text-[#d4af37]" />
-              <span>Login</span>
+              <span>{isLoggedIn && profile?.full_name ? profile.full_name.split(" ")[0] : "Login"}</span>
             </Link>
 
             {/* Cart Icon Button with Live Count */}
@@ -179,7 +181,7 @@ export default function Navbar() {
               className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#d4af37] py-2 px-3 rounded-lg hover:bg-white/5"
             >
               <User className="w-4 h-4 pointer-events-none" />
-              <span>Login</span>
+              <span>{isLoggedIn && profile?.full_name ? profile.full_name : "Login"}</span>
             </Link>
             <Link
               href="/menu"
