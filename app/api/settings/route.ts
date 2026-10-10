@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { RestaurantSettings } from "@/types/database";
+import { enforceRateLimit } from "@/lib/security/rateLimiter";
+import { sanitizeString, validateAmount, validatePhone, validateEmail } from "@/lib/security/validation";
 
 export const DEFAULT_RESTAURANT_SETTINGS: RestaurantSettings = {
   id: "default",
@@ -63,27 +65,34 @@ export async function GET() {
 // POST: Save or update restaurant settings
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "save_settings", { limit: 30, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const body = await request.json();
+
+    const minOrderVal = validateAmount(body?.minimum_order, 0, 50000);
+    const delFeeVal = validateAmount(body?.delivery_fee, 0, 10000);
+    const taxPctVal = validateAmount(body?.tax_percent, 0, 100);
 
     const payload: RestaurantSettings = {
       id: "default",
-      name: body.name?.trim() || DEFAULT_RESTAURANT_SETTINGS.name,
-      phone: body.phone?.trim() || DEFAULT_RESTAURANT_SETTINGS.phone,
-      phone_secondary: body.phone_secondary?.trim() || DEFAULT_RESTAURANT_SETTINGS.phone_secondary,
-      email: body.email?.trim() || DEFAULT_RESTAURANT_SETTINGS.email,
-      address: body.address?.trim() || DEFAULT_RESTAURANT_SETTINGS.address,
-      opening_hours: body.opening_hours?.trim() || DEFAULT_RESTAURANT_SETTINGS.opening_hours,
-      delivery_radius: body.delivery_radius?.trim() || DEFAULT_RESTAURANT_SETTINGS.delivery_radius,
-      minimum_order: Number(body.minimum_order) >= 0 ? Number(body.minimum_order) : DEFAULT_RESTAURANT_SETTINGS.minimum_order,
-      delivery_fee: Number(body.delivery_fee) >= 0 ? Number(body.delivery_fee) : DEFAULT_RESTAURANT_SETTINGS.delivery_fee,
-      tax_percent: Number(body.tax_percent) >= 0 ? Number(body.tax_percent) : DEFAULT_RESTAURANT_SETTINGS.tax_percent,
+      name: sanitizeString(body?.name || DEFAULT_RESTAURANT_SETTINGS.name, 100),
+      phone: body?.phone ? (validatePhone(body.phone).sanitized || DEFAULT_RESTAURANT_SETTINGS.phone) : DEFAULT_RESTAURANT_SETTINGS.phone,
+      phone_secondary: body?.phone_secondary ? (validatePhone(body.phone_secondary).sanitized || DEFAULT_RESTAURANT_SETTINGS.phone_secondary) : DEFAULT_RESTAURANT_SETTINGS.phone_secondary,
+      email: body?.email ? (validateEmail(body.email).sanitized || DEFAULT_RESTAURANT_SETTINGS.email) : DEFAULT_RESTAURANT_SETTINGS.email,
+      address: sanitizeString(body?.address || DEFAULT_RESTAURANT_SETTINGS.address, 300),
+      opening_hours: sanitizeString(body?.opening_hours || DEFAULT_RESTAURANT_SETTINGS.opening_hours, 100),
+      delivery_radius: sanitizeString(body?.delivery_radius || DEFAULT_RESTAURANT_SETTINGS.delivery_radius, 50),
+      minimum_order: minOrderVal.isValid ? minOrderVal.value : DEFAULT_RESTAURANT_SETTINGS.minimum_order,
+      delivery_fee: delFeeVal.isValid ? delFeeVal.value : DEFAULT_RESTAURANT_SETTINGS.delivery_fee,
+      tax_percent: taxPctVal.isValid ? taxPctVal.value : DEFAULT_RESTAURANT_SETTINGS.tax_percent,
       social_links: {
-        instagram: body.social_links?.instagram || DEFAULT_RESTAURANT_SETTINGS.social_links.instagram,
-        whatsapp: body.social_links?.whatsapp || DEFAULT_RESTAURANT_SETTINGS.social_links.whatsapp,
-        facebook: body.social_links?.facebook || DEFAULT_RESTAURANT_SETTINGS.social_links.facebook,
-        google_maps: body.social_links?.google_maps || DEFAULT_RESTAURANT_SETTINGS.social_links.google_maps,
+        instagram: sanitizeString(body?.social_links?.instagram || DEFAULT_RESTAURANT_SETTINGS.social_links.instagram, 200),
+        whatsapp: sanitizeString(body?.social_links?.whatsapp || DEFAULT_RESTAURANT_SETTINGS.social_links.whatsapp, 200),
+        facebook: sanitizeString(body?.social_links?.facebook || DEFAULT_RESTAURANT_SETTINGS.social_links.facebook, 200),
+        google_maps: sanitizeString(body?.social_links?.google_maps || DEFAULT_RESTAURANT_SETTINGS.social_links.google_maps, 300),
       },
-      logo_url: body.logo_url?.trim() || DEFAULT_RESTAURANT_SETTINGS.logo_url,
+      logo_url: sanitizeString(body?.logo_url || DEFAULT_RESTAURANT_SETTINGS.logo_url, 300),
       updated_at: new Date().toISOString(),
     };
 

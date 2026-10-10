@@ -42,84 +42,28 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      // 1. Attempt Supabase Auth login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: password,
+      // 1. Authenticate via secure server API with rate limiting and HTTP-Only session cookies
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
       });
 
-      if (error) {
-        const isDemoAdmin =
-          (trimmedEmail === "nexora67@gmail.com" ||
-            trimmedEmail === "vaibhavpatel8543@gmail.com" ||
-            trimmedEmail === "admin@nexora.com" ||
-            trimmedEmail === "owner@nexora.com") &&
-          (password === "123456" ||
-            password === "admin123" ||
-            password === "nexora2026" ||
-            password.length >= 6);
+      const data = await res.json();
 
-        if (isDemoAdmin) {
-          const adminSession = {
-            id: "admin_master_001",
-            email: trimmedEmail,
-            role: "admin",
-            name:
-              trimmedEmail === "nexora67@gmail.com"
-                ? "NEXORA Admin"
-                : "Vaibhav Patel (Owner)",
-            loggedInAt: new Date().toISOString(),
-          };
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem("nexora_admin_user", JSON.stringify(adminSession));
-            localStorage.setItem("nexora_admin_role", "admin");
-          }
-
-          setSuccessMessage("Admin authentication verified! Accessing dashboard...");
-          setTimeout(() => {
-            router.push("/admin");
-          }, 600);
-          return;
-        }
-
-        throw new Error(error.message || "Invalid email or password.");
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Authentication failed. Please verify credentials.");
       }
 
-      if (data.user) {
-        // 2. Role-based verification from profiles table
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, full_name")
-          .eq("id", data.user.id)
-          .single();
-
-        const role = profile?.role || "admin";
-
-        if (role !== "admin" && role !== "staff") {
-          await supabase.auth.signOut();
-          throw new Error("Access Denied: Admin authorization required.");
-        }
-
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            "nexora_admin_user",
-            JSON.stringify({
-              id: data.user.id,
-              email: data.user.email,
-              role,
-              name: profile?.full_name || "Admin Owner",
-              loggedInAt: new Date().toISOString(),
-            })
-          );
-          localStorage.setItem("nexora_admin_role", role);
-        }
-
-        setSuccessMessage("Admin authentication verified! Accessing dashboard...");
-        setTimeout(() => {
-          router.push("/admin");
-        }, 600);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("nexora_admin_user", JSON.stringify(data.user));
+        localStorage.setItem("nexora_admin_role", data.user.role || "admin");
       }
+
+      setSuccessMessage("Admin authentication verified! Accessing dashboard...");
+      setTimeout(() => {
+        router.push("/admin");
+      }, 500);
     } catch (err: any) {
       setErrorMessage(err.message || "Authentication failed. Please verify credentials.");
     } finally {

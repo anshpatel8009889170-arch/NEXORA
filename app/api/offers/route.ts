@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { enforceRateLimit } from "@/lib/security/rateLimiter";
+import { sanitizeCouponCode, sanitizeString, validateAmount } from "@/lib/security/validation";
 
 export const DEFAULT_OFFERS = [
   {
@@ -49,8 +51,11 @@ export const DEFAULT_OFFERS = [
 ];
 
 // GET: Fetch all offers
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "get_offers", { limit: 120, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const supabase = createServerClient();
     const { data: dbOffers, error } = await supabase
       .from("offers")
@@ -76,6 +81,9 @@ export async function GET() {
 // POST: Create or Update an offer
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "post_offers", { limit: 30, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const body = await request.json();
     const {
       id,
@@ -89,23 +97,29 @@ export async function POST(request: NextRequest) {
       is_active,
     } = body;
 
-    if (!code) {
+    const cleanCode = sanitizeCouponCode(code);
+
+    if (!cleanCode) {
       return NextResponse.json(
-        { success: false, error: "Offer code is required" },
+        { success: false, error: "Valid offer code is required" },
         { status: 400 }
       );
     }
 
-    const cleanCode = String(code).trim().toUpperCase();
+    const cleanDesc = sanitizeString(description || `Special offer for ${cleanCode}`, 250);
+    const validDiscountVal = validateAmount(discount_value, 0, 50000).value;
+    const validMinOrder = validateAmount(minimum_order, 0, 50000).value;
+    const validMaxDiscount = max_discount ? validateAmount(max_discount, 0, 50000).value : null;
+
     const supabase = createServerClient();
 
     const offerPayload: any = {
       code: cleanCode,
-      description: description || `Special offer for ${cleanCode}`,
-      discount_type: discount_type || "percentage",
-      discount_value: Number(discount_value) || 0,
-      minimum_order: Number(minimum_order) || 0,
-      max_discount: max_discount ? Number(max_discount) : null,
+      description: cleanDesc,
+      discount_type: discount_type === "flat" ? "flat" : "percentage",
+      discount_value: validDiscountVal,
+      minimum_order: validMinOrder,
+      max_discount: validMaxDiscount,
       is_active: is_active !== false,
       end_date: end_date || null,
       valid_until: end_date || null,
@@ -155,17 +169,21 @@ export async function POST(request: NextRequest) {
 // PATCH: Toggle enable/disable
 export async function PATCH(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "patch_offers", { limit: 30, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const body = await request.json();
     const { code, is_active } = body;
 
-    if (!code) {
+    const cleanCode = sanitizeCouponCode(code);
+
+    if (!cleanCode) {
       return NextResponse.json(
-        { success: false, error: "Offer code is required" },
+        { success: false, error: "Valid offer code is required" },
         { status: 400 }
       );
     }
 
-    const cleanCode = String(code).trim().toUpperCase();
     const supabase = createServerClient();
 
     const { error } = await supabase
@@ -194,17 +212,21 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Remove offer
 export async function DELETE(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "delete_offers", { limit: 30, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
 
-    if (!code) {
+    const cleanCode = sanitizeCouponCode(code);
+
+    if (!cleanCode) {
       return NextResponse.json(
-        { success: false, error: "Offer code is required" },
+        { success: false, error: "Valid offer code is required" },
         { status: 400 }
       );
     }
 
-    const cleanCode = code.trim().toUpperCase();
     const supabase = createServerClient();
 
     const { error } = await supabase

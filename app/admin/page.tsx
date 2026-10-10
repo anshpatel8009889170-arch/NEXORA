@@ -1110,7 +1110,10 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("nexora_admin_user");
       localStorage.removeItem("nexora_admin_role");

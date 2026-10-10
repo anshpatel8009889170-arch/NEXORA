@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
 import { getRazorpayClient } from "@/lib/razorpay";
-import { supabase } from "@/lib/supabase/client";
+import { createServerClient } from "@/lib/supabase/server";
+import { enforceRateLimit } from "@/lib/security/rateLimiter";
+import {
+  validateAmount,
+  validatePhone,
+  sanitizeString,
+  sanitizeCouponCode,
+} from "@/lib/security/validation";
 
 export async function POST(req: Request) {
   try {
+    // 1. Rate Limiting (Prevent automated checkout flood & credit card testing)
+    const rateLimitResponse = enforceRateLimit(req, "payment_create_order", {
+      limit: 12,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const body = await req.json();
     const {
       orderNumber,
@@ -17,11 +31,27 @@ export async function POST(req: Request) {
       couponCode,
     } = body;
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: "Invalid order amount" }, { status: 400 });
+    // 2. Strict Input Validation & Sanitization
+    const validAmountResult = validateAmount(amount, 1, 150000);
+    if (!validAmountResult.isValid) {
+      return NextResponse.json(
+        { error: "Invalid order amount. Must be a valid positive amount." },
+        { status: 400 }
+      );
     }
 
-    const amountInPaise = Math.round(amount * 100);
+    const safeOrderNumber = sanitizeString(orderNumber, 60) || `ORD-${Date.now()}`;
+    const safeCustomerName = sanitizeString(customerName, 100) || "Valued Patron";
+    const phoneResult = validatePhone(customerPhone || "");
+    const safePhone = phoneResult.isValid ? phoneResult.sanitized : sanitizeString(customerPhone, 20);
+    const safeAddress = sanitizeString(deliveryAddress, 300) || "N/A";
+    const safeCoupon = sanitizeCouponCode(couponCode);
+
+    const validSubtotal = validateAmount(subtotal, 0, 150000).value || validAmountResult.value;
+    const validDeliveryFee = validateAmount(deliveryFee, 0, 1000).value || 0;
+    const validDiscount = validateAmount(discountAmount, 0, 10000).value || 0;
+
+    const amountInPaise = Math.round(validAmountResult.value * 100);
     const razorpay = getRazorpayClient();
     let razorpayOrderId = "";
 
@@ -30,53 +60,55 @@ export async function POST(req: Request) {
       const rzpOrder = await razorpay.orders.create({
         amount: amountInPaise,
         currency: "INR",
-        receipt: orderNumber,
+        receipt: safeOrderNumber,
         notes: {
-          customerName: customerName || "Guest",
-          customerPhone: customerPhone || "N/A",
-          couponCode: couponCode || "None",
+          customerName: safeCustomerName,
+          customerPhone: safePhone,
+          couponCode: safeCoupon || "None",
         },
       });
       razorpayOrderId = rzpOrder.id;
     } else {
-      // Seamless sandbox order for testing without real credentials
+      // Sandbox fallback order for testing without real credentials
       razorpayOrderId = `order_demo_${Date.now()}`;
     }
 
-    // Record initial order as 'pending' in database
+    // 3. Record initial order as 'pending' in database via Server Supabase client
     try {
+      const supabase = createServerClient();
       await supabase.from("orders").insert({
-        order_number: orderNumber,
-        customer_name: customerName || "Guest",
-        customer_phone: customerPhone || "N/A",
+        order_number: safeOrderNumber,
+        customer_name: safeCustomerName,
+        customer_phone: safePhone,
         delivery_type: "delivery",
-        delivery_address: deliveryAddress || "N/A",
+        delivery_address: safeAddress,
         status: "pending",
         payment_method: "online",
         payment_status: "pending",
-        subtotal: subtotal || amount,
-        discount: discountAmount || 0,
-        delivery_fee: deliveryFee || 0,
+        subtotal: validSubtotal,
+        discount: validDiscount,
+        delivery_fee: validDeliveryFee,
         tax: 0,
-        total_amount: amount,
-        coupon_code: couponCode || null,
-        notes: `Razorpay Order: ${razorpayOrderId}${couponCode ? ` | Coupon: ${couponCode}` : ""}`,
+        total_amount: validAmountResult.value,
+        total: validAmountResult.value,
+        notes: `Razorpay Order initiated: ${razorpayOrderId}${safeCoupon ? ` (Coupon: ${safeCoupon})` : ""}`,
       });
     } catch (dbErr) {
-      console.warn("Supabase order recording notice in create-order:", dbErr);
+      console.warn("DB insert pending order warning:", dbErr);
     }
 
     return NextResponse.json({
       success: true,
-      razorpayOrderId,
-      amount: amountInPaise,
+      orderId: razorpayOrderId,
+      amount: validAmountResult.value,
+      amountInPaise,
       currency: "INR",
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_nexora_demo",
-      orderNumber,
+      orderNumber: safeOrderNumber,
+      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || "rzp_test_demo",
     });
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : "Failed to create Razorpay order";
-    console.error("Create order error:", err);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to initialize payment";
+    console.error("Create order payment error:", error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

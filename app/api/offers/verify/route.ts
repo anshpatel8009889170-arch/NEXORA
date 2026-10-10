@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { enforceRateLimit } from "@/lib/security/rateLimiter";
+import { sanitizeCouponCode, validateAmount, validatePhone, sanitizeString } from "@/lib/security/validation";
 
 // Fallback royal offers for local resilience & seeded defaults
 const DEFAULT_FALLBACK_OFFERS = [
@@ -60,20 +62,33 @@ const DEFAULT_FALLBACK_OFFERS = [
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const rawCode = body?.code;
-    const subtotal = Number(body?.subtotal) || 0;
-    const userId = body?.userId ? String(body.userId).trim() : null;
-    const phone = body?.phone ? String(body.phone).trim() : null;
+    const rateLimitRes = enforceRateLimit(request, "verify_coupon", {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitRes) return rateLimitRes;
 
-    if (!rawCode || typeof rawCode !== "string") {
+    const body = await request.json();
+    const cleanCode = sanitizeCouponCode(body?.code);
+    const { isValid: isAmountValid, value: subtotal } = validateAmount(body?.subtotal, 0, 500000);
+    const userId = body?.userId ? sanitizeString(body.userId, 80) : null;
+    const phone = body?.phone ? validatePhone(body.phone).sanitized : null;
+
+    if (!cleanCode) {
       return NextResponse.json(
         { valid: false, error: "Please enter a valid coupon code." },
         { status: 400 }
       );
     }
 
-    const code = rawCode.trim().toUpperCase();
+    if (!isAmountValid) {
+      return NextResponse.json(
+        { valid: false, error: "Invalid order subtotal provided." },
+        { status: 400 }
+      );
+    }
+
+    const code = cleanCode;
 
     // 1. Fetch offer from Supabase database
     const supabase = createServerClient();

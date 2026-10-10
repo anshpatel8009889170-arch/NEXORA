@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { Review } from "@/types/database";
+import { enforceRateLimit } from "@/lib/security/rateLimiter";
+import { sanitizeString } from "@/lib/security/validation";
 
 // In-memory store for fallback/demo when remote database lacks items
 let inMemoryReviews: Review[] = [
@@ -81,6 +83,9 @@ async function seedDefaultReviewsIfEmpty(supabase: any) {
 // ============================================================================
 export async function GET(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "get_reviews", { limit: 120, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const { searchParams } = new URL(request.url);
     const showAll = searchParams.get("all") === "true";
     const userId = searchParams.get("user_id");
@@ -144,6 +149,9 @@ export async function GET(request: NextRequest) {
 // ============================================================================
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "submit_review", { limit: 6, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const body = await request.json();
     const {
       customer_name,
@@ -155,10 +163,14 @@ export async function POST(request: NextRequest) {
       user_id,
     } = body;
 
-    const parsedRating = Math.max(1, Math.min(5, Number(rating) || 5));
-    const cleanName = String(customer_name || "Valued Patron").trim();
-    const cleanComment = String(comment || "").trim();
-    const cleanDish = dish_name ? String(dish_name).trim() : "Overall Dining Experience";
+    const numRating = Number(rating);
+    const parsedRating = Math.max(1, Math.min(5, Math.floor(isNaN(numRating) ? 5 : numRating)));
+    const cleanName = sanitizeString(customer_name || "Valued Patron", 80);
+    const cleanComment = sanitizeString(comment || "", 1000);
+    const cleanDish = dish_name ? sanitizeString(dish_name, 100) : "Overall Dining Experience";
+    const cleanOrderId = order_id ? sanitizeString(order_id, 80) : null;
+    const cleanUserId = user_id ? sanitizeString(user_id, 80) : null;
+    const cleanMenuItemId = menu_item_id ? sanitizeString(menu_item_id, 80) : null;
 
     if (!cleanComment) {
       return NextResponse.json(
@@ -172,10 +184,10 @@ export async function POST(request: NextRequest) {
       customer_name: cleanName,
       rating: parsedRating,
       comment: cleanComment,
-      order_id: order_id || null,
+      order_id: cleanOrderId,
       dish_name: cleanDish,
-      menu_item_id: menu_item_id || null,
-      user_id: user_id || null,
+      menu_item_id: cleanMenuItemId,
+      user_id: cleanUserId,
       is_approved: false, // Requires admin moderation
       created_at: new Date().toISOString(),
     };
@@ -231,8 +243,12 @@ export async function POST(request: NextRequest) {
 // ============================================================================
 export async function PATCH(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "patch_review", { limit: 60, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const body = await request.json();
-    const { id, is_approved } = body;
+    const id = sanitizeString(body?.id, 100);
+    const is_approved = body?.is_approved;
 
     if (!id || typeof is_approved !== "boolean") {
       return NextResponse.json(
@@ -287,6 +303,9 @@ export async function PATCH(request: NextRequest) {
 // ============================================================================
 export async function DELETE(request: NextRequest) {
   try {
+    const rateLimitRes = enforceRateLimit(request, "delete_review", { limit: 60, windowMs: 60 * 1000 });
+    if (rateLimitRes) return rateLimitRes;
+
     const { searchParams } = new URL(request.url);
     let id = searchParams.get("id");
 
@@ -298,6 +317,8 @@ export async function DELETE(request: NextRequest) {
         // no body
       }
     }
+
+    id = sanitizeString(id, 100);
 
     if (!id) {
       return NextResponse.json(
