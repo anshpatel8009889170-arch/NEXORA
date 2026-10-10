@@ -26,6 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/utils/formatters";
 import { Review } from "@/types/database";
 import ReviewModal from "@/components/ReviewModal";
+import AddressMapPicker from "@/components/AddressMapPicker";
 
 type TabType = "orders" | "addresses" | "profile" | "reviews";
 
@@ -58,6 +59,7 @@ function AccountContent() {
 
   // New Address State
   const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
   const [addrType, setAddrType] = useState<"Home" | "Work" | "Other">("Home");
   const [addrStreet, setAddrStreet] = useState("");
   const [addrLandmark, setAddrLandmark] = useState("");
@@ -442,14 +444,24 @@ function AccountContent() {
                   <h3 className="text-lg font-serif font-bold text-[var(--text-main)]">
                     Saved Addresses
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingAddress(!isAddingAddress)}
-                    className="text-xs text-[#d4af37] hover:underline flex items-center gap-1 font-semibold uppercase tracking-wider"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add New Address</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsMapPickerOpen(true)}
+                      className="px-3.5 py-1.5 rounded-full bg-gold-gradient text-black text-xs font-bold uppercase tracking-wider shadow-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <MapPin className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Set Pin on Map</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingAddress(!isAddingAddress)}
+                      className="text-xs text-[var(--text-sub)] hover:text-white px-2.5 py-1.5 rounded-lg border border-[var(--card-border)] hover:border-[#d4af37]/40 flex items-center gap-1 font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Manual</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Inline Add Address Form */}
@@ -547,6 +559,12 @@ function AccountContent() {
                           {addr.landmark ? `, Near ${addr.landmark}` : ""},{" "}
                           {addr.city} {addr.pincode ? `- ${addr.pincode}` : ""}
                         </p>
+                        {addr.latitude && addr.longitude && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#d4af37] bg-[#d4af37]/10 px-2 py-0.5 rounded-full border border-[#d4af37]/30 mt-1">
+                            <MapPin className="w-2.5 h-2.5" />
+                            <span>Pin: {addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -751,6 +769,16 @@ function AccountContent() {
               }
             })
             .catch(() => {});
+        }}
+      />
+
+      {/* Interactive Swiggy-Style Map Address Picker Modal */}
+      <AddressMapPicker
+        isOpen={isMapPickerOpen}
+        onClose={() => setIsMapPickerOpen(false)}
+        onSelectAddress={(selected) => {
+          addSavedAddress(selected);
+          setIsMapPickerOpen(false);
         }}
       />
     </div>

@@ -9,6 +9,8 @@ export interface DeliveryAddressData {
   landmark?: string;
   city: string;
   pincode?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface SavedAddress {
@@ -18,6 +20,8 @@ export interface SavedAddress {
   landmark?: string;
   city: string;
   pincode?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 const initialSavedAddresses: SavedAddress[] = [
@@ -28,6 +32,8 @@ const initialSavedAddresses: SavedAddress[] = [
     landmark: "Sathigva Road",
     city: "Amauli - Fatehpur",
     pincode: "212631",
+    latitude: 25.9284,
+    longitude: 80.4636,
   },
   {
     id: "addr_work",
@@ -36,6 +42,8 @@ const initialSavedAddresses: SavedAddress[] = [
     landmark: "Amauli Road",
     city: "Amauli - Fatehpur",
     pincode: "212631",
+    latitude: 25.9312,
+    longitude: 80.4655,
   },
 ];
 

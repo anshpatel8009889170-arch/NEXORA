@@ -32,6 +32,7 @@ import { useAuth, SavedAddress } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { formatCurrency } from "@/utils/formatters";
 import { supabase } from "@/lib/supabase/client";
+import AddressMapPicker from "@/components/AddressMapPicker";
 
 // Razorpay type definition for window
 declare global {
@@ -83,11 +84,26 @@ export default function CheckoutPage() {
 
   // Add Address Modal / Form Toggle
   const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
   const [newAddrType, setNewAddrType] = useState<"Home" | "Work" | "Other">("Home");
   const [newStreet, setNewStreet] = useState("");
   const [newLandmark, setNewLandmark] = useState("");
   const [newCity, setNewCity] = useState("Amauli - Fatehpur");
   const [newPincode, setNewPincode] = useState("212631");
+
+  const handleAddressFromMap = (addressData: {
+    type: "Home" | "Work" | "Other";
+    street: string;
+    landmark?: string;
+    city: string;
+    pincode?: string;
+    latitude: number;
+    longitude: number;
+  }) => {
+    const newAddr = addSavedAddress(addressData);
+    setSelectedAddressId(newAddr.id);
+    setIsAddingAddress(false);
+  };
 
   // Order Placement & Payment Verification State
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -799,6 +815,12 @@ export default function CheckoutPage() {
                               <p className="text-[11px] text-[var(--text-sub-light)]">
                                 {addr.city} {addr.pincode ? `• ${addr.pincode}` : ""}
                               </p>
+                              {addr.latitude && addr.longitude && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#d4af37] bg-[#d4af37]/10 px-2 py-0.5 rounded-full border border-[#d4af37]/30 mt-1">
+                                  <MapPin className="w-2.5 h-2.5" />
+                                  <span>Pin: {addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -812,16 +834,28 @@ export default function CheckoutPage() {
                     })}
                   </div>
 
-                  {/* + Add Address Trigger / Inline Form */}
+                  {/* Address Actions: Set Pin on Map (Swiggy Style) & Manual Entry */}
                   {!isAddingAddress ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingAddress(true)}
-                      className="w-full py-3 rounded-2xl border border-dashed border-[#d4af37]/50 hover:border-[#d4af37] text-xs font-semibold uppercase tracking-wider text-[#d4af37] hover:bg-[#d4af37]/5 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>+ Add Address</span>
-                    </button>
+                    <div className="space-y-2 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsMapPickerOpen(true)}
+                          className="py-3 px-4 rounded-2xl bg-gold-gradient text-black text-xs font-bold uppercase tracking-wider shadow-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <MapPin className="w-4 h-4 stroke-[2.5]" />
+                          <span>Set Pin on Map (Swiggy Style)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingAddress(true)}
+                          className="py-3 px-4 rounded-2xl border border-[var(--card-border)] bg-[var(--section-alt)] text-[var(--text-sub)] hover:text-white text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>+ Enter Manually</span>
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     /* Add Address Form */
                     <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[#d4af37]/30 space-y-4 animate-in fade-in duration-200">
@@ -1318,6 +1352,13 @@ export default function CheckoutPage() {
           </div>
         </div>
       )}
+
+      {/* Swiggy-Style Interactive Map Address Picker */}
+      <AddressMapPicker
+        isOpen={isMapPickerOpen}
+        onClose={() => setIsMapPickerOpen(false)}
+        onSelectAddress={handleAddressFromMap}
+      />
     </div>
   );
 }
