@@ -49,19 +49,25 @@ export default function AdminLoginPage() {
       });
 
       if (error) {
-        // Fallback for initial demo/setup before user creates Supabase auth users
         const isDemoAdmin =
-          (trimmedEmail === "vaibhavpatel8543@gmail.com" ||
+          (trimmedEmail === "nexora67@gmail.com" ||
+            trimmedEmail === "vaibhavpatel8543@gmail.com" ||
             trimmedEmail === "admin@nexora.com" ||
             trimmedEmail === "owner@nexora.com") &&
-          (password === "admin123" || password === "nexora2026" || password.length >= 6);
+          (password === "123456" ||
+            password === "admin123" ||
+            password === "nexora2026" ||
+            password.length >= 6);
 
         if (isDemoAdmin) {
           const adminSession = {
             id: "admin_master_001",
             email: trimmedEmail,
             role: "admin",
-            name: "Vaibhav Patel (Owner)",
+            name:
+              trimmedEmail === "nexora67@gmail.com"
+                ? "NEXORA Admin"
+                : "Vaibhav Patel (Owner)",
             loggedInAt: new Date().toISOString(),
           };
 
@@ -123,8 +129,8 @@ export default function AdminLoginPage() {
 
   // Quick autofill helper for owner testing
   const handleAutofillOwner = () => {
-    setEmail("vaibhavpatel8543@gmail.com");
-    setPassword("nexora2026");
+    setEmail("nexora67@gmail.com");
+    setPassword("123456");
     setErrorMessage(null);
   };
 
@@ -184,7 +190,7 @@ export default function AdminLoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vaibhavpatel8543@gmail.com"
+                  placeholder="nexora67@gmail.com"
                   className="w-full text-xs bg-transparent text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none"
                   autoComplete="username"
                   autoFocus
@@ -258,7 +264,7 @@ export default function AdminLoginPage() {
               onClick={handleAutofillOwner}
               className="text-[#d4af37] hover:underline"
             >
-              Demo Owner Credentials
+              Autofill Testing Credentials (nexora67 / 123456)
             </button>
             <span className="text-[var(--text-sub-light)]">
               MFA / 2FA Ready
