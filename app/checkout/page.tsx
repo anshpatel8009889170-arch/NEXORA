@@ -84,14 +84,8 @@ export default function CheckoutPage() {
   // Payment Selection: Initially COD is default and active
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi" | "debit" | "credit" | "netbanking">("cod");
 
-  // Add Address Modal / Form Toggle
-  const [isAddingAddress, setIsAddingAddress] = useState(false);
+  // Address Map Picker Toggle
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
-  const [newAddrType, setNewAddrType] = useState<"Home" | "Work" | "Other">("Home");
-  const [newStreet, setNewStreet] = useState("");
-  const [newLandmark, setNewLandmark] = useState("");
-  const [newCity, setNewCity] = useState("Amauli - Fatehpur");
-  const [newPincode, setNewPincode] = useState("212631");
 
   const handleAddressFromMap = (addressData: {
     type: "Home" | "Work" | "Other";
@@ -104,7 +98,7 @@ export default function CheckoutPage() {
   }) => {
     const newAddr = addSavedAddress(addressData);
     setSelectedAddressId(newAddr.id);
-    setIsAddingAddress(false);
+    setIsMapPickerOpen(false);
   };
 
   // Order Placement & Payment Verification State
@@ -212,27 +206,6 @@ export default function CheckoutPage() {
     } else {
       setAuthError(res.message || "Failed to save name.");
     }
-  };
-
-  // Handle Save New Address
-  const handleSaveNewAddress = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStreet.trim()) {
-      alert("Please enter your street address.");
-      return;
-    }
-
-    addSavedAddress({
-      type: newAddrType,
-      street: newStreet.trim(),
-      landmark: newLandmark.trim(),
-      city: newCity.trim(),
-      pincode: newPincode.trim(),
-    });
-
-    setIsAddingAddress(false);
-    setNewStreet("");
-    setNewLandmark("");
   };
 
   // Handle Backend Payment Verification
@@ -854,109 +827,17 @@ export default function CheckoutPage() {
                     })}
                   </div>
 
-                  {/* Address Actions: Set Pin on Map (Swiggy Style) & Manual Entry */}
-                  {!isAddingAddress ? (
-                    <div className="space-y-2 pt-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => setIsMapPickerOpen(true)}
-                          className="py-3 px-4 rounded-2xl bg-gold-gradient text-black text-xs font-bold uppercase tracking-wider shadow-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <MapPin className="w-4 h-4 stroke-[2.5]" />
-                          <span>Set Pin on Map (Swiggy Style)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingAddress(true)}
-                          className="py-3 px-4 rounded-2xl border border-[var(--card-border)] bg-[var(--section-alt)] text-[var(--text-sub)] hover:text-white text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>+ Enter Manually</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Add Address Form */
-                    <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[#d4af37]/30 space-y-4 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between pb-2 border-b border-[var(--card-border)]">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
-                          <Plus className="w-3.5 h-3.5 text-[#d4af37]" />
-                          <span>Add New Address</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingAddress(false)}
-                          className="text-xs text-[var(--text-sub)] hover:text-rose-400"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Tag selector: Home, Work, Other */}
-                      <div className="flex gap-2">
-                        {(["Home", "Work", "Other"] as const).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setNewAddrType(t)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
-                              newAddrType === t
-                                ? "bg-gold-gradient text-black"
-                                : "bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-sub)]"
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          required
-                          value={newStreet}
-                          onChange={(e) => setNewStreet(e.target.value)}
-                          placeholder="Street, House No, Colony *"
-                          className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
-                        />
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <input
-                            type="text"
-                            value={newLandmark}
-                            onChange={(e) => setNewLandmark(e.target.value)}
-                            placeholder="Landmark (Near...)"
-                            className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
-                          />
-                          <input
-                            type="text"
-                            value={newCity}
-                            onChange={(e) => setNewCity(e.target.value)}
-                            placeholder="City"
-                            className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={handleSaveNewAddress}
-                          className="flex-1 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md"
-                        >
-                          Save Address
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingAddress(false)}
-                          className="px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-sub)]"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  {/* Add New Address Button (Opens Interactive Map Picker) */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsMapPickerOpen(true)}
+                      className="w-full py-3.5 px-4 rounded-2xl bg-gold-gradient text-black text-xs font-bold uppercase tracking-wider shadow-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                      <span>Add New Address</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* ========================================================

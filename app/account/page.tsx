@@ -60,14 +60,8 @@ function AccountContent() {
   const [nameInput, setNameInput] = useState("");
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
 
-  // New Address State
-  const [isAddingAddress, setIsAddingAddress] = useState(false);
+  // Map Address Picker State
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
-  const [addrType, setAddrType] = useState<"Home" | "Work" | "Other">("Home");
-  const [addrStreet, setAddrStreet] = useState("");
-  const [addrLandmark, setAddrLandmark] = useState("");
-  const [addrCity, setAddrCity] = useState("Amauli - Fatehpur");
-  const [addrPincode, setAddrPincode] = useState("212631");
 
   // Edit Address State
   const [editingAddress, setEditingAddress] = useState<SavedAddress | null>(null);
@@ -192,22 +186,6 @@ function AccountContent() {
       setProfileMessage("Profile updated successfully!");
       setTimeout(() => setProfileMessage(null), 3000);
     }
-  };
-
-  // Handle Add Address
-  const handleSaveAddress = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!addrStreet.trim()) return;
-    addSavedAddress({
-      type: addrType,
-      street: addrStreet.trim(),
-      landmark: addrLandmark.trim(),
-      city: addrCity.trim(),
-      pincode: addrPincode.trim(),
-    });
-    setIsAddingAddress(false);
-    setAddrStreet("");
-    setAddrLandmark("");
   };
 
   // Start editing existing address
@@ -488,104 +466,15 @@ function AccountContent() {
                   <h3 className="text-lg font-serif font-bold text-[var(--text-main)]">
                     Saved Addresses
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsMapPickerOpen(true)}
-                      className="px-3.5 py-1.5 rounded-full bg-gold-gradient text-black text-xs font-bold uppercase tracking-wider shadow-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <MapPin className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>Set Pin on Map</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingAddress(!isAddingAddress)}
-                      className="text-xs text-[var(--text-sub)] hover:text-white px-2.5 py-1.5 rounded-lg border border-[var(--card-border)] hover:border-[#d4af37]/40 flex items-center gap-1 font-semibold uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Manual</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Inline Add Address Form */}
-                {isAddingAddress && (
-                  <form
-                    onSubmit={handleSaveAddress}
-                    className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[#d4af37]/40 space-y-4 animate-in fade-in duration-200"
+                  <button
+                    type="button"
+                    onClick={() => setIsMapPickerOpen(true)}
+                    className="px-4 py-2 rounded-full bg-gold-gradient text-black text-xs font-bold uppercase tracking-wider shadow-md hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
-                    <h4 className="text-xs uppercase tracking-wider font-semibold text-[var(--text-main)]">
-                      New Delivery Location
-                    </h4>
-
-                    <div className="flex gap-2">
-                      {(["Home", "Work", "Other"] as const).map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setAddrType(type)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${
-                            addrType === type
-                              ? "bg-gold-gradient text-black font-bold border-transparent"
-                              : "bg-[var(--card-bg)] text-[var(--text-sub)] border-[var(--card-border)]"
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        required
-                        value={addrStreet}
-                        onChange={(e) => setAddrStreet(e.target.value)}
-                        placeholder="House / Flat / Street *"
-                        className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
-                      />
-                      <input
-                        type="text"
-                        value={addrLandmark}
-                        onChange={(e) => setAddrLandmark(e.target.value)}
-                        placeholder="Landmark (Near...)"
-                        className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          value={addrCity}
-                          onChange={(e) => setAddrCity(e.target.value)}
-                          placeholder="City"
-                          className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)]"
-                        />
-                        <input
-                          type="text"
-                          value={addrPincode}
-                          onChange={(e) => setAddrPincode(e.target.value)}
-                          placeholder="Pincode"
-                          className="w-full text-xs p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-main)]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="submit"
-                        className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md"
-                      >
-                        Save Address
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingAddress(false)}
-                        className="px-4 py-2 rounded-xl text-xs text-[var(--text-sub)] hover:text-[var(--text-main)]"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Add Address</span>
+                  </button>
+                </div>
 
                 <div className="space-y-3">
                   {savedAddresses.map((addr) => {
