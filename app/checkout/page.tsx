@@ -27,6 +27,7 @@ import {
   Building,
   RefreshCw,
   Check,
+  Trash2,
 } from "lucide-react";
 import { useAuth, SavedAddress } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
@@ -52,6 +53,7 @@ export default function CheckoutPage() {
     selectedAddressId,
     setSelectedAddressId,
     addSavedAddress,
+    deleteSavedAddress,
     sendOtp,
     verifyOtp,
     updateProfileName,
@@ -824,11 +826,29 @@ export default function CheckoutPage() {
                             </div>
                           </div>
 
-                          {isSelected && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gold-gradient text-black shrink-0">
-                              Selected
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isSelected && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gold-gradient text-black">
+                                Selected
+                              </span>
+                            )}
+                            {savedAddresses.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (confirm("Delete this address from saved list?")) {
+                                    deleteSavedAddress(addr.id);
+                                  }
+                                }}
+                                className="p-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title="Delete address"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </label>
                       );
                     })}

@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Plus,
   Trash2,
+  Edit2,
   CheckCircle2,
   Clock,
   ShieldCheck,
@@ -22,7 +23,7 @@ import {
   AlertCircle,
   UtensilsCrossed,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, SavedAddress } from "@/context/AuthContext";
 import { formatCurrency } from "@/utils/formatters";
 import { Review } from "@/types/database";
 import ReviewModal from "@/components/ReviewModal";
@@ -47,6 +48,8 @@ function AccountContent() {
     isLoading,
     savedAddresses,
     addSavedAddress,
+    updateSavedAddress,
+    deleteSavedAddress,
     updateProfileName,
     signOut,
   } = useAuth();
@@ -65,6 +68,19 @@ function AccountContent() {
   const [addrLandmark, setAddrLandmark] = useState("");
   const [addrCity, setAddrCity] = useState("Amauli - Fatehpur");
   const [addrPincode, setAddrPincode] = useState("212631");
+
+  // Edit Address State
+  const [editingAddress, setEditingAddress] = useState<SavedAddress | null>(null);
+  const [editType, setEditType] = useState<"Home" | "Work" | "Other">("Home");
+  const [editStreet, setEditStreet] = useState("");
+  const [editLandmark, setEditLandmark] = useState("");
+  const [editCity, setEditCity] = useState("Amauli - Fatehpur");
+  const [editPincode, setEditPincode] = useState("212631");
+  const [editCoords, setEditCoords] = useState<{ lat?: number; lng?: number }>({});
+  const [isEditMapPickerOpen, setIsEditMapPickerOpen] = useState(false);
+
+  // Delete Address Confirmation State
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Orders State (Includes #1048 per Phase 15 specification)
   const [orders, setOrders] = useState<AccountOrder[]>([
@@ -192,6 +208,34 @@ function AccountContent() {
     setIsAddingAddress(false);
     setAddrStreet("");
     setAddrLandmark("");
+  };
+
+  // Start editing existing address
+  const handleStartEdit = (addr: SavedAddress) => {
+    setEditingAddress(addr);
+    setEditType(addr.type);
+    setEditStreet(addr.street);
+    setEditLandmark(addr.landmark || "");
+    setEditCity(addr.city);
+    setEditPincode(addr.pincode || "");
+    setEditCoords({ lat: addr.latitude, lng: addr.longitude });
+    setDeletingId(null);
+  };
+
+  // Save edited address
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAddress || !editStreet.trim()) return;
+    updateSavedAddress(editingAddress.id, {
+      type: editType,
+      street: editStreet.trim(),
+      landmark: editLandmark.trim(),
+      city: editCity.trim(),
+      pincode: editPincode.trim(),
+      latitude: editCoords.lat,
+      longitude: editCoords.lng,
+    });
+    setEditingAddress(null);
   };
 
   const handleLogout = async () => {
@@ -544,30 +588,103 @@ function AccountContent() {
                 )}
 
                 <div className="space-y-3">
-                  {savedAddresses.map((addr) => (
-                    <div
-                      key={addr.id}
-                      className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-start gap-3 shadow-sm"
-                    >
-                      <MapPin className="w-5 h-5 text-[#d4af37] shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
-                          {addr.type}
-                        </span>
-                        <p className="text-xs text-[var(--text-sub)] leading-relaxed">
-                          {addr.street}
-                          {addr.landmark ? `, Near ${addr.landmark}` : ""},{" "}
-                          {addr.city} {addr.pincode ? `- ${addr.pincode}` : ""}
-                        </p>
-                        {addr.latitude && addr.longitude && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#d4af37] bg-[#d4af37]/10 px-2 py-0.5 rounded-full border border-[#d4af37]/30 mt-1">
-                            <MapPin className="w-2.5 h-2.5" />
-                            <span>Pin: {addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
-                          </span>
+                  {savedAddresses.map((addr) => {
+                    const isDeleting = deletingId === addr.id;
+
+                    return (
+                      <div
+                        key={addr.id}
+                        className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-[#d4af37]/40 transition-all shadow-sm space-y-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] shrink-0 mt-0.5">
+                            <MapPin className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                                {addr.type}
+                              </span>
+                              {addr.latitude && addr.longitude && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#d4af37] bg-[#d4af37]/10 px-2 py-0.5 rounded-full border border-[#d4af37]/30">
+                                  <MapPin className="w-2.5 h-2.5" />
+                                  <span>Pin: {addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[var(--text-sub)] leading-relaxed">
+                              {addr.street}
+                              {addr.landmark ? `, Near ${addr.landmark}` : ""},{" "}
+                              {addr.city} {addr.pincode ? `- ${addr.pincode}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Action buttons directly below address */}
+                        {isDeleting ? (
+                          <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                            <span className="text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              Delete this address?
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  deleteSavedAddress(addr.id);
+                                  setDeletingId(null);
+                                }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500 hover:text-white transition-all cursor-pointer"
+                              >
+                                Yes, Delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingId(null)}
+                                className="px-3 py-1.5 rounded-xl text-xs text-[var(--text-sub)] hover:text-white border border-[var(--card-border)] hover:border-[var(--text-sub)] transition-all cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="pt-2 border-t border-[var(--card-border)] flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(addr)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-main)] hover:text-[#d4af37] bg-[var(--section-alt)] hover:bg-[#d4af37]/10 border border-[var(--card-border)] hover:border-[#d4af37]/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3 text-[#d4af37]" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingId(addr.id)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 bg-[var(--section-alt)] hover:bg-rose-500/10 border border-[var(--card-border)] hover:border-rose-500/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
                         )}
                       </div>
+                    );
+                  })}
+
+                  {savedAddresses.length === 0 && (
+                    <div className="text-center py-12 border border-dashed border-[var(--card-border)] rounded-2xl space-y-3">
+                      <MapPin className="w-8 h-8 text-[var(--text-sub-light)] mx-auto opacity-40" />
+                      <p className="text-xs text-[var(--text-sub)]">No saved delivery addresses found.</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsMapPickerOpen(true)}
+                        className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Add on Map</span>
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
@@ -779,6 +896,168 @@ function AccountContent() {
         onSelectAddress={(selected) => {
           addSavedAddress(selected);
           setIsMapPickerOpen(false);
+        }}
+      />
+
+      {/* Edit Address Modal */}
+      {editingAddress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--card-bg)] border border-[#d4af37]/40 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[var(--card-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#d4af37]" />
+                <h3 className="text-base font-serif font-bold text-[var(--text-main)]">
+                  Edit Delivery Address
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAddress(null)}
+                className="w-8 h-8 rounded-full bg-[var(--section-alt)] text-[var(--text-sub)] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Type selector */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--text-sub)] uppercase tracking-wider">
+                  Address Type
+                </label>
+                <div className="flex gap-2">
+                  {(["Home", "Work", "Other"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setEditType(type)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                        editType === type
+                          ? "bg-gold-gradient text-black font-bold border-transparent shadow-sm"
+                          : "bg-[var(--section-alt)] text-[var(--text-sub)] border-[var(--card-border)] hover:border-[#d4af37]/30"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Form Inputs */}
+              <div className="space-y-2.5">
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-sub)] uppercase tracking-wider block mb-1">
+                    House / Flat / Street *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editStreet}
+                    onChange={(e) => setEditStreet(e.target.value)}
+                    placeholder="House / Flat / Street"
+                    className="w-full text-xs p-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-sub)] uppercase tracking-wider block mb-1">
+                    Landmark (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editLandmark}
+                    onChange={(e) => setEditLandmark(e.target.value)}
+                    placeholder="Near Temple / Janseva Kendra"
+                    className="w-full text-xs p-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--text-sub)] uppercase tracking-wider block mb-1">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      placeholder="City"
+                      className="w-full text-xs p-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--text-sub)] uppercase tracking-wider block mb-1">
+                      Pincode
+                    </label>
+                    <input
+                      type="text"
+                      value={editPincode}
+                      onChange={(e) => setEditPincode(e.target.value)}
+                      placeholder="Pincode"
+                      className="w-full text-xs p-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pin Map Action */}
+              <div className="p-3 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] flex items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <p className="text-[11px] font-semibold text-[var(--text-main)]">Map Pin Location</p>
+                  <p className="text-[10px] font-mono text-[var(--text-sub)]">
+                    {editCoords.lat && editCoords.lng
+                      ? `${editCoords.lat.toFixed(4)}, ${editCoords.lng.toFixed(4)}`
+                      : "No coordinates pinned"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMapPickerOpen(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/40 hover:bg-[#d4af37] hover:text-black transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Adjust on Map</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md cursor-pointer transition-all"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingAddress(null)}
+                  className="px-4 py-3 rounded-xl text-xs text-[var(--text-sub)] hover:text-white border border-[var(--card-border)] cursor-pointer transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Address Map Picker */}
+      <AddressMapPicker
+        isOpen={isEditMapPickerOpen}
+        onClose={() => setIsEditMapPickerOpen(false)}
+        initialCoords={
+          editCoords.lat && editCoords.lng
+            ? { lat: editCoords.lat, lng: editCoords.lng }
+            : undefined
+        }
+        onSelectAddress={(data) => {
+          setEditStreet(data.street);
+          if (data.landmark) setEditLandmark(data.landmark);
+          setEditCity(data.city);
+          if (data.pincode) setEditPincode(data.pincode);
+          setEditType(data.type);
+          setEditCoords({ lat: data.latitude, lng: data.longitude });
+          setIsEditMapPickerOpen(false);
         }}
       />
     </div>

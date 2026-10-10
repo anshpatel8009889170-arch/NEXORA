@@ -63,6 +63,8 @@ interface AuthContextType {
   selectedAddressId: string;
   setSelectedAddressId: (id: string) => void;
   addSavedAddress: (address: Omit<SavedAddress, "id">) => SavedAddress;
+  updateSavedAddress: (id: string, address: Partial<Omit<SavedAddress, "id">>) => void;
+  deleteSavedAddress: (id: string) => void;
   sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; mockOtp?: string }>;
   verifyOtp: (phone: string, token: string) => Promise<{ success: boolean; message?: string; isNewUser?: boolean }>;
   updateProfileName: (fullName: string) => Promise<{ success: boolean; message?: string }>;
@@ -211,6 +213,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("nexora-saved-addresses", JSON.stringify(updated));
     localStorage.setItem("nexora-selected-address-id", newAddr.id);
     return newAddr;
+  };
+
+  // Update saved address
+  const updateSavedAddress = (id: string, updatedFields: Partial<Omit<SavedAddress, "id">>): void => {
+    const updated = savedAddresses.map((addr) =>
+      addr.id === id ? { ...addr, ...updatedFields } : addr
+    );
+    setSavedAddresses(updated);
+    localStorage.setItem("nexora-saved-addresses", JSON.stringify(updated));
+  };
+
+  // Delete saved address
+  const deleteSavedAddress = (id: string): void => {
+    const updated = savedAddresses.filter((addr) => addr.id !== id);
+    setSavedAddresses(updated);
+    localStorage.setItem("nexora-saved-addresses", JSON.stringify(updated));
+    if (selectedAddressId === id) {
+      const nextId = updated.length > 0 ? updated[0].id : "";
+      setSelectedAddressId(nextId);
+      localStorage.setItem("nexora-selected-address-id", nextId);
+    }
   };
 
   // Send OTP to phone
@@ -444,6 +467,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         selectedAddressId,
         setSelectedAddressId: handleSelectAddressId,
         addSavedAddress,
+        updateSavedAddress,
+        deleteSavedAddress,
         sendOtp,
         verifyOtp,
         updateProfileName,
