@@ -166,15 +166,16 @@ export default function Home() {
 
         <div className="relative max-w-4xl mx-auto text-center space-y-8 py-20">
           <div className="space-y-4">
-            <p className="text-xs sm:text-sm uppercase tracking-[0.35em] text-[#d4af37] font-semibold">
-              WELCOME TO NEXORA
-            </p>
-
-            {/* Heading */}
+            {/* Primary Main Heading */}
             <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif font-bold tracking-tight text-[var(--text-main)] leading-[1.15]">
-              A Taste of Something{" "}
-              <span className="text-gold-gradient block mt-2">Extraordinary</span>
+              WELCOME TO <span className="text-gold-gradient">NEXORA</span>
             </h1>
+
+            {/* Sub-heading (A little smaller than main title) */}
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-[var(--text-main)]/90 leading-snug">
+              A Taste of Something{" "}
+              <span className="text-gold-gradient">Extraordinary</span>
+            </h2>
           </div>
 
           {/* Subtitle */}
