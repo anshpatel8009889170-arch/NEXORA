@@ -470,12 +470,12 @@ export default function CartPage() {
                         value={couponInput}
                         onChange={(e) => setCouponInput(e.target.value.toUpperCase().replace(/\s+/g, ""))}
                         placeholder="Enter coupon code (e.g. SAVE50)"
-                        className="flex-1 text-xs uppercase font-mono tracking-wider px-3.5 py-2.5 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                        className="flex-1 min-w-0 text-xs uppercase font-mono tracking-wider px-3.5 py-2.5 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
                       />
                       <button
                         type="submit"
                         disabled={isApplyingCoupon || !couponInput.trim()}
-                        className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-98 disabled:opacity-40 shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer font-mono"
+                        className="shrink-0 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-98 disabled:opacity-40 shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer font-mono"
                       >
                         {isApplyingCoupon ? (
                           <>

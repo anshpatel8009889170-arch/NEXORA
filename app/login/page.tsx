@@ -332,7 +332,7 @@ function LoginContent() {
                 value={otpInput}
                 onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
                 placeholder="123456"
-                className="w-full text-center text-2xl font-mono tracking-[0.5em] py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                className="w-full text-center text-xl sm:text-2xl font-mono tracking-[0.25em] sm:tracking-[0.5em] py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
                 autoFocus
               />
             </div>

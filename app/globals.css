@@ -198,3 +198,33 @@ html.light .bg-gold-gradient,
   background: linear-gradient(135deg, #e6c566 0%, #c99b22 100%) !important;
   color: #000000 !important;
 }
+
+/* ==========================================================================
+   3. MOBILE RESPONSIVENESS & TOUCH UTILITIES (Phase 29)
+   Optimized for 390px (Mobile), 768px (Tablet), 1440px & 1920px (Desktop)
+   ========================================================================== */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Hide scrollbars cleanly on horizontal chips while preserving smooth swipe */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe area support for iOS home bar indicator */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+}
+
+/* Container bounds on extra wide displays (1920px+) */
+@media (min-width: 1920px) {
+  .max-w-7xl {
+    max-width: 1536px;
+  }
+}

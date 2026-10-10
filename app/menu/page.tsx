@@ -356,25 +356,6 @@ export default function MenuPage() {
         )}
       </main>
 
-      {/* Floating Sticky Cart Indicator if items exist */}
-      {totalItems > 0 && (
-        <div className="fixed bottom-6 right-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <Link
-            href="/cart"
-            className="flex items-center gap-3 px-5 py-3 rounded-full bg-gold-gradient text-black font-semibold text-xs uppercase tracking-wider shadow-2xl gold-glow hover:opacity-95 active:scale-95 transition-all cursor-pointer border border-black/20"
-          >
-            <div className="relative">
-              <ShoppingBag className="w-4 h-4" />
-              <span className="absolute -top-1.5 -right-2 bg-black text-[#d4af37] text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                {totalItems}
-              </span>
-            </div>
-            <span>{totalItems} Item{totalItems > 1 ? "s" : ""} • {formatCurrency(subtotal)}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--card-bg)] text-[var(--text-main)] border border-[#d4af37]/50 px-5 py-3 rounded-full shadow-2xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200">

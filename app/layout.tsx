@@ -1,12 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 // Theme-synced layout
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ThemeToggle from "@/components/ThemeToggle";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import FloatingCartBar from "@/components/FloatingCartBar";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { SettingsProvider } from "@/context/SettingsContext";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0a0a0a",
+};
 
 export const metadata: Metadata = {
   title: "NEXORA | Fine Dining, Gourmet Cuisine & Lounge",
@@ -27,8 +36,10 @@ export default function RootLayout({
           <AuthProvider>
             <CartProvider>
               <Navbar />
-              <div className="flex-1 pt-20">{children}</div>
+              <div className="flex-1 pt-20 pb-20 md:pb-0">{children}</div>
+              <FloatingCartBar />
               <Footer />
+              <MobileBottomNav />
               <ThemeToggle />
             </CartProvider>
           </AuthProvider>

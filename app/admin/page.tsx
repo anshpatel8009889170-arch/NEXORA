@@ -1226,46 +1226,48 @@ export default function AdminDashboardPage() {
             LEFT SIDEBAR
             Orders, Menu, Categories, Customers, Offers, Tables, Reviews, Analytics, Settings
             ============================================================ */}
-        <aside className="w-full md:w-64 border-r border-[var(--card-border)] bg-[var(--section-alt)] p-4 flex flex-col justify-between shrink-0">
-          <nav className="space-y-1">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-sub-light)] px-3 py-2 block font-semibold">
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-[var(--card-border)] bg-[var(--section-alt)] p-2.5 sm:p-3 md:p-4 flex flex-col md:justify-between shrink-0">
+          <div className="md:space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-sub-light)] px-2.5 py-1 md:px-3 md:py-2 block font-semibold">
               Management Menu
             </span>
-            {sidebarItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between transition-all ${
-                    isActive
-                      ? "bg-gold-gradient text-black font-bold shadow-md"
-                      : "text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-white/5"
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </span>
-                  {item.id === "orders" && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                        isActive
-                          ? "bg-black text-[#d4af37]"
-                          : "bg-[#d4af37]/20 text-[#d4af37]"
-                      }`}
-                    >
-                      6
+            <nav className="flex flex-row overflow-x-auto no-scrollbar gap-1.5 pb-1 md:pb-0 md:flex-col md:space-y-1">
+              {sidebarItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    className={`shrink-0 px-3 py-2 md:w-full md:px-3.5 md:py-2.5 rounded-xl text-xs font-medium flex items-center justify-between gap-2.5 transition-all cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? "bg-gold-gradient text-black font-bold shadow-md"
+                        : "text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 md:gap-3">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span>{item.label}</span>
                     </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+                    {item.id === "orders" && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                          isActive
+                            ? "bg-black text-[#d4af37]"
+                            : "bg-[#d4af37]/20 text-[#d4af37]"
+                        }`}
+                      >
+                        6
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
-          <div className="pt-6 border-t border-[var(--card-border)] text-[11px] text-[var(--text-sub)] space-y-1 px-2">
+          <div className="hidden md:block pt-6 border-t border-[var(--card-border)] text-[11px] text-[var(--text-sub)] space-y-1 px-2">
             <p className="font-semibold text-[var(--text-main)]">NEXORA Fine Dining</p>
             <p className="text-[10px]">Sathigva, Amauli-Fatehpur Road</p>
           </div>
@@ -1274,7 +1276,7 @@ export default function AdminDashboardPage() {
         {/* ============================================================
             RIGHT MAIN CONTENT AREA
             ============================================================ */}
-        <main className="flex-1 p-6 sm:p-8 space-y-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto">
           {/* ==========================================================
               TAB: DASHBOARD (MAIN SCREEN MATCHING USER SPECIFICATION)
               Today's Revenue: ₹12,450
