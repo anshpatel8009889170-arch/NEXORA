@@ -264,8 +264,28 @@ export default function CheckoutPage() {
       return;
     }
 
-    const orderNum = `NX-${Math.floor(100000 + Math.random() * 900000)}`;
+    const orderNum = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
     const fullAddress = `${selectedAddr.type}: ${selectedAddr.street}, Landmark: ${selectedAddr.landmark || "N/A"}, ${selectedAddr.city} - ${selectedAddr.pincode || "212631"}`;
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "nexora_last_order",
+        JSON.stringify({
+          orderNumber: orderNum,
+          items: items.map((i) => ({
+            id: i.menuItem.id,
+            name: i.menuItem.name,
+            quantity: i.quantity,
+            price: i.menuItem.discount_price ?? i.menuItem.price,
+          })),
+          total: grandTotal,
+          address: fullAddress,
+          paymentMethod,
+          isPaid: paymentMethod !== "cod",
+          createdAt: new Date().toISOString(),
+        })
+      );
+    }
 
     // A. CASH ON DELIVERY (COD) FLOW
     if (paymentMethod === "cod") {
@@ -403,72 +423,58 @@ export default function CheckoutPage() {
     );
   }
 
-  // ORDER SUCCESS CELEBRATION VIEW
+  // PHASE 13 — ORDER CONFIRMATION VIEW
   if (placedOrderNumber) {
     return (
       <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col selection:bg-[#d4af37]/30 selection:text-white">
-        <main className="flex-1 pt-12 pb-24 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full flex items-center justify-center">
-          <div className="p-8 sm:p-12 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-2xl text-center space-y-6 gold-glow animate-in zoom-in-95 duration-300 w-full">
-            <div className="relative w-24 h-24 mx-auto rounded-full bg-emerald-500/10 border-2 border-emerald-500 flex items-center justify-center shadow-2xl">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+        <main className="flex-1 pt-16 pb-24 px-4 sm:px-6 lg:px-8 max-w-lg mx-auto w-full flex items-center justify-center">
+          <div className="p-8 sm:p-12 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-2xl text-center space-y-7 gold-glow animate-in zoom-in-95 duration-300 w-full">
+            {/* Payment Status Label */}
+            <p className="text-xs sm:text-sm font-medium text-[var(--text-sub)]">
+              {isOrderPaid ? "Payment successful:" : "Payment: Cash on Delivery"}
+            </p>
+
+            {/* Clean Green Checkmark Icon */}
+            <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/10 border-2 border-emerald-500 flex items-center justify-center shadow-lg">
+              <Check className="w-10 h-10 text-emerald-400 stroke-[3]" />
             </div>
 
+            {/* ORDER CONFIRMED & Order ID */}
             <div className="space-y-2">
-              <span className="px-3.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.25em] bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30">
-                {isOrderPaid ? "Order Placed & Verified Paid" : "Order Confirmed"}
-              </span>
-              <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[var(--text-main)] pt-2">
-                Thank You, {profile?.full_name || "Guest"}!
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold uppercase tracking-wider text-[var(--text-main)]">
+                ORDER CONFIRMED
               </h1>
-              <p className="text-xs sm:text-sm text-[var(--text-sub)] max-w-md mx-auto leading-relaxed">
-                Your royal order <span className="font-mono font-bold text-[#d4af37]">#{placedOrderNumber}</span> has been received by our kitchen. Our master chefs are preparing your pure vegetarian feast.
+              <p className="text-base sm:text-lg font-mono font-bold text-[#d4af37]">
+                Order #{placedOrderNumber}
               </p>
             </div>
 
-            {/* Order Details Confirmation Box */}
-            <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] space-y-3 text-xs text-left max-w-md mx-auto">
-              <div className="flex justify-between items-center text-[var(--text-sub)]">
-                <span>Order Reference</span>
-                <span className="font-mono font-bold text-[#d4af37]">#{placedOrderNumber}</span>
-              </div>
-              <div className="flex justify-between items-center text-[var(--text-sub)]">
-                <span>Estimated Delivery</span>
-                <span className="text-emerald-400 font-semibold">30–35 mins (Steaming Hot)</span>
-              </div>
-              <div className="flex justify-between items-center text-[var(--text-sub)]">
-                <span>Payment Status</span>
-                <span className="font-bold flex items-center gap-1">
-                  {isOrderPaid ? (
-                    <span className="text-emerald-400 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> PAID (Razorpay Verified)
-                    </span>
-                  ) : (
-                    <span className="text-amber-400">Pay on Delivery (COD)</span>
-                  )}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-[var(--card-border)] flex justify-between items-center font-serif text-sm font-bold text-[var(--text-main)]">
-                <span>Total Amount</span>
-                <span className="text-gold-gradient text-base">{formatCurrency(grandTotal || 0)}</span>
-              </div>
+            {/* Estimated time */}
+            <div className="py-4 px-6 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] max-w-xs mx-auto space-y-1">
+              <span className="text-xs text-[var(--text-sub)] uppercase tracking-wider block">
+                Estimated time:
+              </span>
+              <p className="text-xl font-serif font-bold text-[var(--text-main)]">
+                35–45 minutes
+              </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            {/* [ TRACK ORDER ] Button */}
+            <div className="pt-2 space-y-3">
               <Link
-                href="/menu"
-                className="w-full sm:w-auto px-8 py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-lg"
+                href={`/track-order?orderId=${placedOrderNumber}`}
+                className="w-full py-4 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl"
               >
-                <span>Back to Menu</span>
+                <span>TRACK ORDER</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
 
-              <a
-                href="https://wa.me/918303890056"
-                target="_blank"
-                rel="noreferrer"
-                className="w-full sm:w-auto px-6 py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-[var(--card-bg)] text-[var(--text-main)] border border-[#d4af37]/40 hover:border-[#d4af37] active:scale-95 transition-all"
+              <Link
+                href="/menu"
+                className="inline-block text-xs text-[var(--text-sub)] hover:text-[#d4af37] transition-colors pt-1"
               >
-                <span>Track on WhatsApp</span>
-              </a>
+                Back to Menu
+              </Link>
             </div>
           </div>
         </main>
