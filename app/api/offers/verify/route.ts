@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeCouponCode, validateAmount, validatePhone, sanitizeString } from "@/lib/security/validation";
+import { findRuntimeOffer } from "@/lib/offersStore";
 
 // Fallback royal offers for local resilience & seeded defaults
 const DEFAULT_FALLBACK_OFFERS = [
@@ -108,9 +109,9 @@ export async function POST(request: NextRequest) {
       console.warn("Supabase offer lookup notice:", err);
     }
 
-    // Fallback to built-in offers if database record is missing
+    // Fallback to runtime / built-in offers if database record is missing
     if (!offer) {
-      offer = DEFAULT_FALLBACK_OFFERS.find(
+      offer = findRuntimeOffer(code) || DEFAULT_FALLBACK_OFFERS.find(
         (o) => o.code.toUpperCase() === code
       );
     }

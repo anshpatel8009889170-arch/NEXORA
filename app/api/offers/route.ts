@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeCouponCode, sanitizeString, validateAmount } from "@/lib/security/validation";
+import {
+  getRuntimeOffers,
+  saveRuntimeOffer,
+  toggleRuntimeOffer,
+  deleteRuntimeOffer,
+} from "@/lib/offersStore";
 
 export const DEFAULT_OFFERS = [
   {
@@ -137,6 +143,11 @@ export async function POST(request: NextRequest) {
       offerPayload.id = id;
     }
 
+    saveRuntimeOffer({
+      id: id || `offer_${Date.now()}`,
+      ...offerPayload,
+    });
+
     const { data, error } = await supabase
       .from("offers")
       .upsert(offerPayload, { onConflict: "code" })
@@ -156,7 +167,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, offer: data });
+    return NextResponse.json({ success: true, offer: data || offerPayload });
   } catch (error: any) {
     console.error("POST /api/offers error:", error);
     return NextResponse.json(
@@ -183,6 +194,8 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    toggleRuntimeOffer(cleanCode, Boolean(is_active));
 
     const supabase = createServerClient();
 
@@ -226,6 +239,8 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    deleteRuntimeOffer(cleanCode);
 
     const supabase = createServerClient();
 
