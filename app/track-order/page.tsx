@@ -256,21 +256,66 @@ function TrackOrderContent() {
                 </p>
               )}
 
-              {/* Restaurant Contact Card */}
-              <div className="p-4 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] space-y-3">
-                <p className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
-                  Need Help With Your Order?
-                </p>
-                <p className="text-[11px] text-[var(--text-sub)] leading-relaxed font-light">
-                  Our team is available to assist you with live kitchen updates or delivery adjustments.
-                </p>
-                <a
-                  href="tel:+918303890056"
-                  className="w-full py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider bg-[var(--card-bg)] border border-[#d4af37]/40 text-[#d4af37] hover:border-[#d4af37] hover:bg-[#d4af37]/10 transition-all flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Call: +91 83038 90056</span>
-                </a>
+              {/* Instant Support (Two Direct Contacts) */}
+              <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
+                    Instant Support
+                  </p>
+                  <p className="text-[11px] text-[var(--text-sub)] pt-0.5 font-light">
+                    Directly contact our restaurant kitchen or your assigned delivery partner:
+                  </p>
+                </div>
+
+                <div className="space-y-2.5">
+                  {/* 1. Restaurant Staff / Kitchen Worker */}
+                  <div className="p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37]">
+                        <ChefHat className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--text-main)]">
+                          Restaurant Staff
+                        </p>
+                        <p className="text-[10px] text-[var(--text-sub)] font-mono">
+                          +91 83038 90056
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href="tel:+918303890056"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30 hover:bg-[#d4af37] hover:text-black transition-all flex items-center gap-1.5"
+                    >
+                      <Phone className="w-3 h-3" />
+                      <span>Call</span>
+                    </a>
+                  </div>
+
+                  {/* 2. Delivery Boy / Partner */}
+                  <div className="p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                        <Bike className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--text-main)]">
+                          Delivery Boy
+                        </p>
+                        <p className="text-[10px] text-[var(--text-sub)] font-mono">
+                          +91 91204 89210
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href="tel:+919120489210"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-black transition-all flex items-center gap-1.5"
+                    >
+                      <Phone className="w-3 h-3" />
+                      <span>Call</span>
+                    </a>
+                  </div>
+                </div>
               </div>
 
               {/* Navigation Back */}
