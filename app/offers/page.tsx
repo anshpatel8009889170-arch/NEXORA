@@ -26,20 +26,40 @@ export default function OffersPage() {
   useEffect(() => {
     async function loadOffers() {
       try {
+        // 1. Check local admin offers
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("nexora_admin_offers");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setOffers(parsed.filter((o: Offer) => o.is_active));
+            }
+          }
+        }
+
+        // 2. Fetch from /api/offers
+        const res = await fetch("/api/offers");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.offers) && json.offers.length > 0) {
+            setOffers(json.offers.filter((o: Offer) => o.is_active));
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // 3. Fallback direct Supabase query
         const { data, error } = await supabase
           .from("offers")
           .select("*")
           .eq("is_active", true)
           .order("created_at", { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           setOffers(data as Offer[]);
-        } else {
-          setOffers([]);
         }
       } catch (err) {
-        console.error("Error fetching offers:", err);
-        setOffers([]);
+        console.warn("Notice loading offers:", err);
       } finally {
         setIsLoading(false);
       }

@@ -49,7 +49,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
-import { OrderStatus, MenuItem, Category } from "@/types/database";
+import { OrderStatus, MenuItem, Category, Offer } from "@/types/database";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
 import { uploadDishImage } from "@/lib/storage";
 
@@ -86,6 +86,53 @@ interface AdminOrder {
   time: string;
   address: string;
 }
+
+const initialAdminOffers: Offer[] = [
+  {
+    id: "offer_save50",
+    code: "SAVE50",
+    description: "Special 20% discount on gourmet fine-dining orders above ₹499 (Max ₹150)",
+    discount_type: "percentage",
+    discount_value: 20,
+    minimum_order: 499,
+    max_discount: 150,
+    is_active: true,
+    created_at: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "offer_welcome50",
+    code: "WELCOME50",
+    description: "Flat ₹50 savings on your royal order above ₹299",
+    discount_type: "flat",
+    discount_value: 50,
+    minimum_order: 299,
+    max_discount: null,
+    is_active: true,
+    created_at: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "offer_royal100",
+    code: "ROYAL100",
+    description: "Flat ₹100 savings on royal dining and party orders above ₹599",
+    discount_type: "flat",
+    discount_value: 100,
+    minimum_order: 599,
+    max_discount: null,
+    is_active: true,
+    created_at: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "offer_festive20",
+    code: "FESTIVE20",
+    description: "Festive celebration 20% discount up to ₹200 on luxury orders above ₹499",
+    discount_type: "percentage",
+    discount_value: 20,
+    minimum_order: 499,
+    max_discount: 200,
+    is_active: true,
+    created_at: "2026-01-01T00:00:00.000Z",
+  },
+];
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -191,6 +238,21 @@ export default function AdminDashboardPage() {
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [imageInputMode, setImageInputMode] = useState<"upload" | "url">("upload");
 
+  // Offers & Coupons Management State (Phase 22)
+  const [offersList, setOffersList] = useState<Offer[]>(initialAdminOffers);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState<boolean>(false);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  const [offerForm, setOfferForm] = useState({
+    code: "SAVE50",
+    description: "Special 20% discount on gourmet fine-dining orders above ₹499 (Max ₹150)",
+    discount_type: "percentage",
+    discount_value: 20,
+    minimum_order: 499,
+    max_discount: 150,
+    end_date: "",
+    is_active: true,
+  });
+
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -239,11 +301,168 @@ export default function AdminDashboardPage() {
         } else {
           localStorage.setItem("nexora_admin_categories", JSON.stringify(fallbackCategories));
         }
+        // Load / Sync Admin Offers from localStorage & API (Phase 22)
+        try {
+          const storedOffers = localStorage.getItem("nexora_admin_offers");
+          if (storedOffers) {
+            const parsedOffers = JSON.parse(storedOffers);
+            if (Array.isArray(parsedOffers) && parsedOffers.length > 0) {
+              setOffersList(parsedOffers);
+            } else {
+              localStorage.setItem("nexora_admin_offers", JSON.stringify(initialAdminOffers));
+            }
+          } else {
+            localStorage.setItem("nexora_admin_offers", JSON.stringify(initialAdminOffers));
+          }
+
+          // Background sync from /api/offers
+          fetch("/api/offers")
+            .then((res) => res.json())
+            .then((json) => {
+              if (json.success && Array.isArray(json.offers) && json.offers.length > 0) {
+                setOffersList(json.offers);
+                localStorage.setItem("nexora_admin_offers", JSON.stringify(json.offers));
+              }
+            })
+            .catch(() => {});
+        } catch (err) {
+          console.warn("Error syncing admin offers from storage:", err);
+        }
       } catch (err) {
         console.warn("Error syncing admin categories from storage:", err);
       }
     }
   }, [router]);
+
+  // ==========================================================
+  // PHASE 22: OFFERS & COUPONS MANAGEMENT HANDLERS
+  // ==========================================================
+  const saveOffersToStorage = (updated: Offer[]) => {
+    setOffersList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_admin_offers", JSON.stringify(updated));
+      window.dispatchEvent(new Event("nexora_offers_updated"));
+    }
+  };
+
+  const handleOpenAddOfferModal = () => {
+    setEditingOffer(null);
+    setOfferForm({
+      code: "",
+      description: "",
+      discount_type: "percentage",
+      discount_value: 20,
+      minimum_order: 499,
+      max_discount: 150,
+      end_date: "",
+      is_active: true,
+    });
+    setIsOfferModalOpen(true);
+  };
+
+  const handleOpenEditOfferModal = (offer: Offer) => {
+    setEditingOffer(offer);
+    const discVal = Number(
+      offer.discount_value ??
+      (offer.discount_type === "percentage" ? offer.discount_percent : offer.discount_amount) ??
+      0
+    );
+    setOfferForm({
+      code: offer.code,
+      description: offer.description || "",
+      discount_type: offer.discount_type || "percentage",
+      discount_value: discVal,
+      minimum_order: Number(offer.minimum_order ?? offer.min_order_amount ?? 0),
+      max_discount: offer.max_discount ? Number(offer.max_discount) : 0,
+      end_date: offer.end_date || offer.valid_until ? (offer.end_date || offer.valid_until)!.split("T")[0] : "",
+      is_active: offer.is_active,
+    });
+    setIsOfferModalOpen(true);
+  };
+
+  const handleToggleOfferStatus = async (offerCode: string) => {
+    const updated = offersList.map((o) =>
+      o.code === offerCode ? { ...o, is_active: !o.is_active } : o
+    );
+    saveOffersToStorage(updated);
+    try {
+      const target = updated.find((o) => o.code === offerCode);
+      await fetch("/api/offers", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: offerCode, is_active: target?.is_active }),
+      });
+    } catch (err) {
+      console.warn("Could not patch offer to server:", err);
+    }
+  };
+
+  const handleDeleteOffer = async (offerCode: string) => {
+    if (!confirm(`Are you sure you want to delete coupon offer "${offerCode}"?`)) return;
+    const updated = offersList.filter((o) => o.code !== offerCode);
+    saveOffersToStorage(updated);
+    try {
+      await fetch(`/api/offers?code=${encodeURIComponent(offerCode)}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("Could not delete offer on server:", err);
+    }
+  };
+
+  const handleSaveOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerForm.code.trim()) return;
+
+    const cleanCode = offerForm.code.trim().toUpperCase();
+    const payload = {
+      code: cleanCode,
+      description: offerForm.description.trim() || `${cleanCode} Promo Offer`,
+      discount_type: offerForm.discount_type,
+      discount_value: Number(offerForm.discount_value) || 0,
+      minimum_order: Number(offerForm.minimum_order) || 0,
+      max_discount: offerForm.max_discount ? Number(offerForm.max_discount) : null,
+      end_date: offerForm.end_date ? new Date(offerForm.end_date).toISOString() : null,
+      is_active: offerForm.is_active,
+    };
+
+    let updated: Offer[];
+    if (editingOffer) {
+      updated = offersList.map((o) =>
+        o.id === editingOffer.id || o.code === editingOffer.code
+          ? {
+              ...o,
+              ...payload,
+            }
+          : o
+      );
+    } else {
+      const newOffer: Offer = {
+        id: `offer_${Date.now()}`,
+        ...payload,
+        created_at: new Date().toISOString(),
+      };
+      updated = [newOffer, ...offersList];
+    }
+
+    saveOffersToStorage(updated);
+    setIsOfferModalOpen(false);
+    setEditingOffer(null);
+
+    // Sync to backend /api/offers
+    try {
+      await fetch("/api/offers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingOffer?.id,
+          ...payload,
+        }),
+      });
+    } catch (err) {
+      console.warn("Could not sync offer to server:", err);
+    }
+  };
 
   // ==========================================================
   // PHASE 20: CATEGORY MANAGEMENT HANDLERS (Add, Edit, Delete, Reorder, Enable/Disable)
@@ -1665,45 +1884,150 @@ export default function AdminDashboardPage() {
           {/* ==========================================================
               TAB: OFFERS
               ========================================================== */}
+          {/* ==========================================================
+              TAB: OFFERS (PHASE 22 - Offers & Coupon Management)
+              ========================================================== */}
           {activeTab === "offers" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="pb-4 border-b border-[var(--card-border)]">
-                <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                  Promotions & Coupon Offers
-                </h2>
-                <p className="text-xs text-[var(--text-sub)]">
-                  Active discounts applicable on checkout and cart.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-[#d4af37]" />
+                    Promotions &amp; Coupon Offers
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Configure royal discount codes, minimum order value, maximum caps, and activation status.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddOfferModal}
+                  className="px-4 py-2.5 rounded-xl bg-gold-gradient text-black font-semibold text-xs flex items-center justify-center gap-2 shadow-md hover:opacity-90 transition-all cursor-pointer font-mono"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>+ Add Offer</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[#d4af37]/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-base text-[#d4af37]">
-                      WELCOME50
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
-                      Active
-                    </span>
-                  </div>
-                  <p className="text-xs text-[var(--text-sub)]">
-                    Flat ₹50 OFF on first order above ₹300.
-                  </p>
-                </div>
+              {/* Offers Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {offersList.map((offer) => {
+                  const isPct =
+                    offer.discount_type === "percentage" ||
+                    (!offer.discount_type && offer.discount_percent);
+                  const discVal =
+                    offer.discount_value ??
+                    (isPct ? offer.discount_percent : offer.discount_amount) ??
+                    0;
+                  const minOrder =
+                    offer.minimum_order ?? offer.min_order_amount ?? 0;
 
-                <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-base text-[var(--text-main)]">
-                      ROYAL100
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
-                      Active
-                    </span>
-                  </div>
-                  <p className="text-xs text-[var(--text-sub)]">
-                    Flat ₹100 OFF on banquet and luxury party orders above ₹999.
-                  </p>
-                </div>
+                  return (
+                    <div
+                      key={offer.id || offer.code}
+                      className={`relative p-5 rounded-2xl bg-[var(--card-bg)] border transition-all space-y-4 ${
+                        offer.is_active
+                          ? "border-[#d4af37]/40 shadow-sm hover:border-[#d4af37]"
+                          : "border-[var(--card-border)] opacity-75"
+                      }`}
+                    >
+                      {/* Top Bar: Code & Discount Badge */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-extrabold text-lg text-gold-gradient tracking-wider">
+                            {offer.code}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30">
+                            {isPct ? `${discVal}% OFF` : `₹${discVal} FLAT OFF`}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            offer.is_active
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                              : "bg-zinc-500/15 text-zinc-400 border border-zinc-500/30"
+                          }`}
+                        >
+                          {offer.is_active ? "Active" : "Disabled"}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-xs text-[var(--text-sub)] line-clamp-2 min-h-[32px]">
+                        {offer.description || "Special offer applicable on royal fine-dining orders."}
+                      </p>
+
+                      {/* Key Conditions (Min Order, Max Discount) */}
+                      <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-[11px]">
+                        <div>
+                          <span className="text-[var(--text-sub-light)] block text-[10px]">Min Order</span>
+                          <span className="font-bold text-[var(--text-main)]">
+                            Min ₹{minOrder}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[var(--text-sub-light)] block text-[10px]">Max Discount</span>
+                          <span className="font-bold text-[var(--text-main)]">
+                            {offer.max_discount ? `₹${offer.max_discount}` : "No Limit"}
+                          </span>
+                        </div>
+                        <div className="col-span-2 pt-1 border-t border-[var(--card-border)]/50 text-[10px] text-[var(--text-sub)] flex items-center justify-between">
+                          <span>Expiry:</span>
+                          <span className="font-mono">
+                            {offer.end_date || offer.valid_until
+                              ? new Date(offer.end_date || offer.valid_until!).toLocaleDateString()
+                              : "Ongoing (No Expiry)"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons: [Edit] [Disable/Enable] [Delete] */}
+                      <div className="flex items-center gap-2 pt-1 border-t border-[var(--card-border)]">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditOfferModal(offer)}
+                          className="flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold bg-[var(--section-alt)] text-[var(--text-main)] hover:text-[#d4af37] border border-[var(--card-border)] hover:border-[#d4af37]/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleOfferStatus(offer.code)}
+                          className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            offer.is_active
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                          }`}
+                        >
+                          {offer.is_active ? (
+                            <>
+                              <EyeOff className="w-3.5 h-3.5" />
+                              <span>Disable</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Enable</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOffer(offer.code)}
+                          className="p-1.5 rounded-xl text-[var(--text-sub-light)] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                          title="Delete Offer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2345,6 +2669,180 @@ export default function AdminDashboardPage() {
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
                   <span>[ SAVE CATEGORY ]</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================================
+          MODAL: ADD / EDIT OFFER (PHASE 22)
+          ========================================================== */}
+      {isOfferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
+              <div>
+                <h3 className="text-lg font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-[#d4af37]" />
+                  <span>{editingOffer ? "Edit Offer Code" : "Create New Coupon Offer"}</span>
+                </h3>
+                <p className="text-xs text-[var(--text-sub)]">
+                  {editingOffer ? `Updating ${editingOffer.code} discount parameters` : "Add a promo code for customer discounts"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOfferModalOpen(false)}
+                className="p-2 rounded-xl text-[var(--text-sub)] hover:text-white hover:bg-[var(--section-alt)] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveOffer} className="space-y-4">
+              {/* Field: Offer Code */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                  Coupon Code *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={offerForm.code}
+                  onChange={(e) => setOfferForm({ ...offerForm, code: e.target.value.toUpperCase().replace(/\s+/g, "") })}
+                  placeholder="e.g. SAVE50"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm font-mono font-bold tracking-wider text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              {/* Field: Discount Type & Value */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                    Discount Type
+                  </label>
+                  <select
+                    value={offerForm.discount_type}
+                    onChange={(e) => setOfferForm({ ...offerForm, discount_type: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  >
+                    <option value="percentage">Percentage Discount (%)</option>
+                    <option value="flat">Flat Amount Discount (₹)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                    {offerForm.discount_type === "percentage" ? "Discount Percentage (%) *" : "Flat Discount (₹) *"}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={offerForm.discount_type === "percentage" ? "100" : "5000"}
+                    required
+                    value={offerForm.discount_value}
+                    onChange={(e) => setOfferForm({ ...offerForm, discount_value: Number(e.target.value) })}
+                    placeholder={offerForm.discount_type === "percentage" ? "20" : "50"}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+              </div>
+
+              {/* Field: Minimum Order & Maximum Discount */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                    Min Order Value (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={offerForm.minimum_order}
+                    onChange={(e) => setOfferForm({ ...offerForm, minimum_order: Number(e.target.value) })}
+                    placeholder="499"
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                    Max Discount Cap (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={offerForm.max_discount || ""}
+                    onChange={(e) => setOfferForm({ ...offerForm, max_discount: Number(e.target.value) || 0 })}
+                    placeholder="e.g. 150 (Leave empty for no limit)"
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm font-mono text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+              </div>
+
+              {/* Field: Expiry Date */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center justify-between">
+                  <span>Expiry Date</span>
+                  <span className="text-[10px] text-[var(--text-sub)] font-normal">Optional (Leave blank for ongoing)</span>
+                </label>
+                <input
+                  type="date"
+                  value={offerForm.end_date}
+                  onChange={(e) => setOfferForm({ ...offerForm, end_date: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              {/* Field: Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                  Description / Terms
+                </label>
+                <textarea
+                  rows={2}
+                  value={offerForm.description}
+                  onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
+                  placeholder="Special 20% discount on gourmet fine-dining orders..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37] resize-none"
+                />
+              </div>
+
+              {/* Field: Active Status */}
+              <div className="p-4 rounded-2xl bg-[var(--background)] border border-[var(--card-border)]">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs font-semibold text-[var(--text-main)]">
+                      Active (Redeemable by guests at checkout)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={offerForm.is_active}
+                    onChange={(e) => setOfferForm({ ...offerForm, is_active: e.target.checked })}
+                    className="w-4 h-4 accent-[#d4af37] cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsOfferModalOpen(false)}
+                  className="w-1/3 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] bg-[var(--section-alt)] hover:text-white border border-[var(--card-border)] transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-mono"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>[ SAVE OFFER ]</span>
                 </button>
               </div>
             </form>

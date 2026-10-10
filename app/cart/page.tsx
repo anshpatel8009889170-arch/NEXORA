@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,13 +20,17 @@ import {
   Sparkles,
   UtensilsCrossed,
   MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/utils/formatters";
 import { supabase } from "@/lib/supabase/client";
+import { Offer } from "@/types/database";
 
 export default function CartPage() {
   const router = useRouter();
+  const { user, profile } = useAuth();
   const {
     items,
     totalItems,
@@ -48,11 +52,43 @@ export default function CartPage() {
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
   const [cookingInstructions, setCookingInstructions] = useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [availableOffers, setAvailableOffers] = useState<Offer[]>([]);
 
-  // Handle applying a coupon code
-  const handleApplyCoupon = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = couponInput.trim().toUpperCase();
+  // Load available active offers for quick one-click chips
+  useEffect(() => {
+    async function loadActiveOffers() {
+      try {
+        // 1. Try local admin storage first for immediate updates
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("nexora_admin_offers");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAvailableOffers(parsed.filter((o: Offer) => o.is_active));
+            }
+          }
+        }
+
+        // 2. Query /api/offers
+        const res = await fetch("/api/offers");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.offers)) {
+            setAvailableOffers(json.offers.filter((o: Offer) => o.is_active));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load offers:", err);
+      }
+    }
+
+    loadActiveOffers();
+  }, []);
+
+  // Handle applying a coupon code via Backend Verification API (/api/offers/verify)
+  const handleApplyCoupon = async (e?: React.FormEvent, customCode?: string) => {
+    if (e) e.preventDefault();
+    const code = (customCode || couponInput).trim().toUpperCase();
     if (!code) return;
 
     setCouponError(null);
@@ -60,92 +96,44 @@ export default function CartPage() {
     setIsApplyingCoupon(true);
 
     try {
-      // 1. Check popular built-in promo codes
-      if (code === "WELCOME50") {
-        if (subtotal < 299) {
-          setCouponError("WELCOME50 requires a minimum order of ₹299.");
-          setIsApplyingCoupon(false);
-          return;
-        }
-        applyCoupon({
-          code: "WELCOME50",
-          discountType: "flat",
-          discountValue: 50,
-          minOrder: 299,
+      // Backend Verification checks: valid?, expired?, minimum order?, maximum discount?, already used?
+      const res = await fetch("/api/offers/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          subtotal,
+          userId: user?.id,
+          phone: user?.phone || profile?.phone,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.valid) {
+        const applied = applyCoupon({
+          code: data.code,
+          discountType: data.discountType,
+          discountValue: data.discountValue,
+          minOrder: data.minOrder,
+          maxDiscount: data.maxDiscount,
         });
-        setCouponSuccess("Coupon WELCOME50 applied! Flat ₹50 saved.");
-        setCouponInput("");
-        setIsApplyingCoupon(false);
-        return;
-      }
 
-      if (code === "ROYAL100") {
-        if (subtotal < 599) {
-          setCouponError("ROYAL100 requires a minimum order of ₹599.");
-          setIsApplyingCoupon(false);
-          return;
+        if (applied) {
+          setCouponSuccess(data.message || `Coupon ${data.code} applied successfully!`);
+          setCouponError(null);
+          setCouponInput("");
+        } else {
+          setCouponError(`Coupon requires minimum order of ₹${data.minOrder}.`);
+          setCouponSuccess(null);
         }
-        applyCoupon({
-          code: "ROYAL100",
-          discountType: "flat",
-          discountValue: 100,
-          minOrder: 599,
-        });
-        setCouponSuccess("Coupon ROYAL100 applied! Flat ₹100 saved.");
-        setCouponInput("");
-        setIsApplyingCoupon(false);
-        return;
-      }
-
-      if (code === "FESTIVE20") {
-        if (subtotal < 499) {
-          setCouponError("FESTIVE20 requires a minimum order of ₹499.");
-          setIsApplyingCoupon(false);
-          return;
-        }
-        applyCoupon({
-          code: "FESTIVE20",
-          discountType: "percentage",
-          discountValue: 20,
-          minOrder: 499,
-        });
-        setCouponSuccess("Coupon FESTIVE20 applied! 20% discount applied.");
-        setCouponInput("");
-        setIsApplyingCoupon(false);
-        return;
-      }
-
-      // 2. Query dynamic offers from Supabase database
-      const { data: dbOffers, error } = await supabase
-        .from("offers")
-        .select("*")
-        .eq("code", code)
-        .eq("is_active", true)
-        .limit(1);
-
-      if (!error && dbOffers && dbOffers.length > 0) {
-        const offer = dbOffers[0];
-        const minOrder = offer.minimum_order || 0;
-        if (subtotal < minOrder) {
-          setCouponError(`This coupon requires a minimum order of ₹${minOrder}.`);
-          setIsApplyingCoupon(false);
-          return;
-        }
-
-        const isPercent = offer.discount_percent && offer.discount_percent > 0;
-        applyCoupon({
-          code: offer.code,
-          discountType: isPercent ? "percentage" : "flat",
-          discountValue: isPercent ? offer.discount_percent : (offer.discount_amount || 50),
-          minOrder: minOrder,
-        });
-        setCouponSuccess(`Coupon ${offer.code} successfully applied!`);
-        setCouponInput("");
       } else {
-        setCouponError(`"${code}" is not a valid or active coupon code.`);
+        setCouponError(data.error || `Unable to apply coupon "${code}".`);
+        setCouponSuccess(null);
       }
     } catch {
-      setCouponError("Unable to validate coupon code at this time.");
+      setCouponError("Unable to verify coupon on server. Please try again.");
+      setCouponSuccess(null);
     } finally {
       setIsApplyingCoupon(false);
     }
@@ -402,24 +390,40 @@ export default function CartPage() {
                 </span>
               </h2>
 
-              {/* Coupon Code Section */}
+              {/* Coupon Code Section (PHASE 22 - Verified Offers & Coupons) */}
               <div className="space-y-3">
-                <div className="flex items-center gap-1.5 text-xs text-[var(--text-sub)]">
-                  <Tag className="w-3.5 h-3.5 text-[#d4af37]" />
-                  <span>Have a royal promo code?</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-sub)]">
+                    <Tag className="w-3.5 h-3.5 text-[#d4af37]" />
+                    <span className="font-semibold text-[var(--text-main)]">Have a coupon?</span>
+                  </div>
+                  <Link
+                    href="/offers"
+                    className="text-[10px] text-[#d4af37] hover:underline flex items-center gap-0.5"
+                  >
+                    <span>View all offers</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </Link>
                 </div>
 
                 {appliedCoupon ? (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      </div>
                       <div>
-                        <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                          {appliedCoupon.code} Applied
-                        </p>
-                        <p className="text-[10px] text-[var(--text-sub)]">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-mono font-bold text-emerald-400 tracking-wider">
+                            {appliedCoupon.code}
+                          </p>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300">
+                            Applied
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-sub)]">
                           {appliedCoupon.discountType === "percentage"
-                            ? `${appliedCoupon.discountValue}% discount applied`
+                            ? `${appliedCoupon.discountValue}% discount applied${appliedCoupon.maxDiscount ? ` (up to ₹${appliedCoupon.maxDiscount})` : ""}`
                             : `₹${appliedCoupon.discountValue} flat savings applied`}
                         </p>
                       </div>
@@ -427,41 +431,76 @@ export default function CartPage() {
                     <button
                       type="button"
                       onClick={removeCoupon}
-                      className="text-xs text-[var(--text-sub)] hover:text-rose-400 p-1"
+                      className="px-2 py-1 rounded-lg text-[11px] font-semibold text-[var(--text-sub)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       aria-label="Remove coupon"
                     >
-                      <X className="w-4 h-4" />
+                      Remove
                     </button>
                   </div>
                 ) : (
-                  <form onSubmit={handleApplyCoupon} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value)}
-                      placeholder="e.g. WELCOME50"
-                      className="flex-1 text-xs uppercase font-mono tracking-wider px-3.5 py-2.5 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isApplyingCoupon || !couponInput.trim()}
-                      className="px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider bg-[var(--card-bg)] border border-[#d4af37]/40 text-[#d4af37] hover:border-[#d4af37] hover:bg-[#d4af37]/10 disabled:opacity-40 transition-all"
-                    >
-                      {isApplyingCoupon ? "..." : "Apply"}
-                    </button>
-                  </form>
+                  <div className="space-y-2.5">
+                    {/* Quick Available Coupon Chips */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {(availableOffers.length > 0 ? availableOffers : [
+                        { code: "SAVE50", discount_type: "percentage", discount_value: 20, minimum_order: 499 },
+                        { code: "WELCOME50", discount_type: "flat", discount_value: 50, minimum_order: 299 },
+                        { code: "ROYAL100", discount_type: "flat", discount_value: 100, minimum_order: 599 },
+                      ]).slice(0, 3).map((offer: any) => (
+                        <button
+                          key={offer.code}
+                          type="button"
+                          onClick={() => {
+                            setCouponInput(offer.code);
+                            handleApplyCoupon(undefined, offer.code);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-[#d4af37]/10 text-[#d4af37] hover:bg-[#d4af37]/20 border border-[#d4af37]/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>{offer.code}</span>
+                          <span className="text-[9px] font-sans font-normal opacity-80">
+                            {offer.discount_type === "percentage" ? `${offer.discount_value}% OFF` : `₹${offer.discount_value} OFF`}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Coupon Form: [ INPUT ] [ APPLY ] */}
+                    <form onSubmit={(e) => handleApplyCoupon(e)} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                        placeholder="Enter coupon code (e.g. SAVE50)"
+                        className="flex-1 text-xs uppercase font-mono tracking-wider px-3.5 py-2.5 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isApplyingCoupon || !couponInput.trim()}
+                        className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-98 disabled:opacity-40 shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer font-mono"
+                      >
+                        {isApplyingCoupon ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          <span>APPLY</span>
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 )}
 
+                {/* Backend Verification Feedback */}
                 {couponError && (
-                  <div className="flex items-center gap-1.5 text-[11px] text-rose-400 pt-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{couponError}</span>
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="leading-tight">{couponError}</span>
                   </div>
                 )}
                 {couponSuccess && (
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 pt-1">
-                    <Check className="w-3.5 h-3.5 shrink-0" />
-                    <span>{couponSuccess}</span>
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 animate-in fade-in">
+                    <Check className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="leading-tight">{couponSuccess}</span>
                   </div>
                 )}
               </div>

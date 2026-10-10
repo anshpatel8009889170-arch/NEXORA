@@ -8,6 +8,7 @@ export interface AppliedCoupon {
   discountType: "flat" | "percentage";
   discountValue: number;
   minOrder?: number;
+  maxDiscount?: number;
 }
 
 interface CartContextType {
@@ -153,7 +154,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   if (appliedCoupon && items.length > 0) {
     if (subtotal >= (appliedCoupon.minOrder || 0)) {
       if (appliedCoupon.discountType === "percentage") {
-        discountAmount = Math.round((subtotal * appliedCoupon.discountValue) / 100);
+        let calc = Math.round((subtotal * appliedCoupon.discountValue) / 100);
+        if (appliedCoupon.maxDiscount && appliedCoupon.maxDiscount > 0) {
+          calc = Math.min(calc, appliedCoupon.maxDiscount);
+        }
+        discountAmount = calc;
       } else {
         discountAmount = appliedCoupon.discountValue;
       }

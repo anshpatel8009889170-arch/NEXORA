@@ -14,6 +14,7 @@ export async function POST(req: Request) {
       subtotal,
       deliveryFee,
       discountAmount,
+      couponCode,
     } = body;
 
     if (!amount || amount <= 0) {
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
         notes: {
           customerName: customerName || "Guest",
           customerPhone: customerPhone || "N/A",
+          couponCode: couponCode || "None",
         },
       });
       razorpayOrderId = rzpOrder.id;
@@ -57,7 +59,8 @@ export async function POST(req: Request) {
         delivery_fee: deliveryFee || 0,
         tax: 0,
         total_amount: amount,
-        notes: `Razorpay Order: ${razorpayOrderId}`,
+        coupon_code: couponCode || null,
+        notes: `Razorpay Order: ${razorpayOrderId}${couponCode ? ` | Coupon: ${couponCode}` : ""}`,
       });
     } catch (dbErr) {
       console.warn("Supabase order recording notice in create-order:", dbErr);

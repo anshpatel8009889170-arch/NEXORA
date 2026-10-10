@@ -306,6 +306,8 @@ export default function CheckoutPage() {
           delivery_fee: deliveryFee,
           tax: 0,
           total_amount: grandTotal,
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          notes: appliedCoupon ? `Coupon: ${appliedCoupon.code}` : null,
         });
       } catch (err) {
         console.warn("Supabase order recording notice:", err);
@@ -336,6 +338,7 @@ export default function CheckoutPage() {
           subtotal,
           deliveryFee,
           discountAmount,
+          couponCode: appliedCoupon ? appliedCoupon.code : null,
         }),
       });
 
