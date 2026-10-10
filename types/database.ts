@@ -153,6 +153,7 @@ export interface Review {
   user_id?: string | null;
   order_id?: string | null;
   menu_item_id?: string | null;
+  dish_name?: string | null;
   customer_name?: string;
   rating: number; // 1 to 5
   comment?: string | null;

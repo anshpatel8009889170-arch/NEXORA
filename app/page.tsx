@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import FoodCard from "@/components/FoodCard";
 import Toast from "@/components/Toast";
+import ReviewModal from "@/components/ReviewModal";
 import { useCart } from "@/context/CartContext";
 import { MenuItem } from "@/types/database";
 
@@ -117,13 +118,13 @@ export default function Home() {
     { name: "Artisanal Desserts & Drinks", count: "16 Delights", tag: "Sweet & Sips" },
   ];
 
-  // Guest Reviews
-  const reviews = [
+  // Guest Reviews (Public website par sirf approved reviews - Phase 25)
+  const [reviews, setReviews] = useState([
     {
       name: "Vikram Malhotra",
       role: "Food Connoisseur",
       comment:
-        "The Truffle Paneer Tikka and Butter Chicken Grand Cru are pure gastronomic magic. Unmatched luxury ambiance and prompt delivery!",
+        "The Truffle Malai Chaap and Dal Bukhara Grand Cru are pure gastronomic magic. Unmatched pure-veg luxury ambiance and prompt delivery!",
       rating: 5,
     },
     {
@@ -140,7 +141,26 @@ export default function Home() {
         "Thermal express delivery arrived steaming hot in exactly 30 minutes. Sourdough pizza crust and packaging are world-class.",
       rating: 5,
     },
-  ];
+  ]);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+
+  // Sync approved reviews from API
+  useEffect(() => {
+    fetch("/api/reviews")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.reviews) && json.reviews.length > 0) {
+          const mapped = json.reviews.map((r: any) => ({
+            name: r.customer_name || "Valued Patron",
+            role: r.dish_name || "Verified Patron",
+            comment: r.comment,
+            rating: r.rating || 5,
+          }));
+          setReviews(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleAddToCart = (item: MenuItem) => {
     addToCart(item);
@@ -400,6 +420,31 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        {/* Customer Write Review Callout (Phase 25) */}
+        <div className="mt-14 text-center p-8 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/30 max-w-xl mx-auto space-y-3 shadow-lg">
+          <div className="flex items-center justify-center gap-1.5 text-[#d4af37]">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star key={s} className="w-5 h-5 fill-current" />
+            ))}
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-xl font-serif font-bold text-[var(--text-main)]">
+              How was your order?
+            </h3>
+            <p className="text-xs text-[var(--text-sub)] font-light">
+              Dined with us or ordered to your doorstep? Share your authentic experience.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsReviewModalOpen(true)}
+            className="px-8 py-3 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md inline-flex items-center gap-2 cursor-pointer"
+          >
+            <Star className="w-4 h-4 fill-current" />
+            <span>Write Review</span>
+          </button>
+        </div>
       </section>
 
       {/* ===================================================================
@@ -520,6 +565,28 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        onSuccess={() => {
+          fetch("/api/reviews")
+            .then((res) => res.json())
+            .then((json) => {
+              if (json.success && Array.isArray(json.reviews)) {
+                const mapped = json.reviews.map((r: any) => ({
+                  name: r.customer_name || "Valued Patron",
+                  role: r.dish_name || "Verified Patron",
+                  comment: r.comment,
+                  rating: r.rating || 5,
+                }));
+                setReviews(mapped);
+              }
+            })
+            .catch(() => {});
+        }}
+      />
     </main>
   );
 }

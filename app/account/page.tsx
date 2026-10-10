@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/utils/formatters";
+import { Review } from "@/types/database";
+import ReviewModal from "@/components/ReviewModal";
 
 type TabType = "orders" | "addresses" | "profile" | "reviews";
 
@@ -80,6 +82,31 @@ function AccountContent() {
     },
   ]);
 
+  // Customer Reviews State (Phase 25)
+  const [userReviews, setUserReviews] = useState<Review[]>([
+    {
+      id: "usr_rev_1",
+      customer_name: "Ansh Patel",
+      dish_name: "Truffle Malai Paneer Tikka",
+      rating: 5,
+      comment: "The clay oven smoked aroma and cashew marinade was absolutely exquisite.",
+      is_approved: true,
+      created_at: "2026-10-09T18:30:00.000Z",
+    },
+    {
+      id: "usr_rev_2",
+      customer_name: "Ansh Patel",
+      dish_name: "NEXORA Royal Dal Bukhara",
+      rating: 5,
+      comment: "Slow cooked overnight perfection. Authentic royal flavors!",
+      is_approved: true,
+      created_at: "2026-10-09T20:45:00.000Z",
+    },
+  ]);
+  const [isAccountReviewModalOpen, setIsAccountReviewModalOpen] = useState(false);
+  const [reviewTargetDish, setReviewTargetDish] = useState("");
+  const [reviewTargetOrder, setReviewTargetOrder] = useState("");
+
   // Load last order if available in localStorage
   useEffect(() => {
     if (profile?.full_name) {
@@ -111,8 +138,25 @@ function AccountContent() {
           });
         } catch {}
       }
+
+      // Sync reviews from API (Phase 25)
+      fetch("/api/reviews?all=true")
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && Array.isArray(json.reviews)) {
+            const relevant = json.reviews.filter(
+              (r: Review) =>
+                r.customer_name?.toLowerCase().includes("ansh") ||
+                (user?.id && r.user_id === user.id)
+            );
+            if (relevant.length > 0) {
+              setUserReviews(relevant);
+            }
+          }
+        })
+        .catch(() => {});
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const customerName = profile?.full_name || (isLoggedIn ? "Ansh" : "Ansh");
   const rawPhone = user?.phone || profile?.phone || "+91 98765 43210";
@@ -349,15 +393,32 @@ function AccountContent() {
                         {ord.items.join(", ")}
                       </p>
 
-                      {/* [View Details] Action Button */}
-                      <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between">
-                        <Link
-                          href={`/track-order?orderId=ORD-${ord.orderNumber}`}
-                          className="px-5 py-2 rounded-full text-xs font-semibold uppercase tracking-wider bg-[var(--section-alt)] text-[#d4af37] border border-[#d4af37]/40 hover:bg-gold-gradient hover:text-black hover:border-transparent active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
-                        >
-                          <span>View Details</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
+                      {/* Action Buttons: [View Details], [Rate Order] and Reorder */}
+                      <div className="pt-2 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/track-order?orderId=ORD-${ord.orderNumber}`}
+                            className="px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[var(--section-alt)] text-[#d4af37] border border-[#d4af37]/40 hover:bg-gold-gradient hover:text-black hover:border-transparent active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span>View Details</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+
+                          {ord.status === "Delivered" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReviewTargetOrder(`ORD-${ord.orderNumber}`);
+                                setReviewTargetDish(ord.items[0]?.split(" ×")[0] || "");
+                                setIsAccountReviewModalOpen(true);
+                              }}
+                              className="px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/30 hover:bg-[#d4af37] hover:text-black active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Star className="w-3 h-3 fill-current" />
+                              <span>Rate Order</span>
+                            </button>
+                          )}
+                        </div>
 
                         <Link
                           href="/menu"
@@ -559,53 +620,139 @@ function AccountContent() {
                 ======================================================== */}
             {activeTab === "reviews" && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-serif font-bold text-[var(--text-main)]">
-                    Your Reviews
-                  </h3>
-                  <span className="text-xs text-[#d4af37] font-semibold uppercase tracking-wider">
-                    2 Rated Dishes
-                  </span>
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--card-border)]">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold text-[var(--text-main)]">
+                      Your Reviews
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)]">
+                      Patron reviews submitted from your account.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewTargetDish("");
+                      setReviewTargetOrder("");
+                      setIsAccountReviewModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Write Review</span>
+                  </button>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-2 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold text-[var(--text-main)]">
-                        Truffle Malai Paneer Tikka
-                      </h4>
-                      <div className="flex items-center text-[#d4af37]">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 fill-current" />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-xs text-[var(--text-sub)] italic font-light">
-                      &ldquo;The clay oven smoked aroma and cashew marinade was absolutely exquisite.&rdquo;
+                {/* Interactive Feedback Prompt Card */}
+                <div className="p-6 rounded-3xl bg-[var(--section-alt)] border border-[#d4af37]/30 text-center space-y-3 shadow-md">
+                  <div className="flex items-center justify-center gap-1.5 text-[#d4af37]">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Star key={i} className="w-5 h-5 fill-current" />
+                    ))}
+                  </div>
+                  <div className="space-y-0.5">
+                    <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
+                      How was your order?
+                    </h4>
+                    <p className="text-xs text-[var(--text-sub)] font-light max-w-sm mx-auto">
+                      Rate your dish and tell us how we can serve you better. Public website par sirf approved reviews display honge.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewTargetDish("");
+                      setReviewTargetOrder("");
+                      setIsAccountReviewModalOpen(true);
+                    }}
+                    className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    <span>Write Review</span>
+                  </button>
+                </div>
 
-                  <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-2 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold text-[var(--text-main)]">
-                        NEXORA Royal Dal Bukhara
-                      </h4>
-                      <div className="flex items-center text-[#d4af37]">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 fill-current" />
-                        ))}
+                {/* User Reviews List */}
+                <div className="space-y-4">
+                  {userReviews.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-3 shadow-sm hover:border-[#d4af37]/30 transition-all"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-[var(--text-main)]">
+                            {rev.dish_name || "Overall Dining Experience"}
+                          </h4>
+                          {rev.order_id && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-sub)]">
+                              #{rev.order_id}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-0.5 text-[#d4af37]">
+                            {[...Array(rev.rating || 5)].map((_, i) => (
+                              <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                            ))}
+                          </div>
+
+                          {/* Approval Status */}
+                          {rev.is_approved ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              <span>Approved &amp; Live</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Under Moderation</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <blockquote className="text-xs text-[var(--text-sub)] italic font-light leading-relaxed p-3 rounded-xl bg-[var(--section-alt)] border-l-2 border-[#d4af37]">
+                        &ldquo;{rev.comment}&rdquo;
+                      </blockquote>
+
+                      <div className="text-[10px] text-[var(--text-sub-light)] font-mono">
+                        {typeof rev.created_at === "string" ? rev.created_at.split("T")[0] : "Recent"}
                       </div>
                     </div>
-                    <p className="text-xs text-[var(--text-sub)] italic font-light">
-                      &ldquo;Slow cooked overnight perfection. Authentic royal flavors!&rdquo;
-                    </p>
-                  </div>
+                  ))}
+
+                  {userReviews.length === 0 && (
+                    <div className="text-center py-12 border border-dashed border-[var(--card-border)] rounded-2xl space-y-2">
+                      <Star className="w-8 h-8 text-[var(--text-sub-light)] mx-auto opacity-40" />
+                      <p className="text-xs text-[var(--text-sub)]">You haven&apos;t written any reviews yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </section>
         </div>
       </main>
+
+      {/* Account Review Modal */}
+      <ReviewModal
+        isOpen={isAccountReviewModalOpen}
+        onClose={() => setIsAccountReviewModalOpen(false)}
+        defaultDishName={reviewTargetDish}
+        orderId={reviewTargetOrder}
+        onSuccess={() => {
+          fetch("/api/reviews?all=true")
+            .then((res) => res.json())
+            .then((json) => {
+              if (json.success && Array.isArray(json.reviews)) {
+                setUserReviews(json.reviews);
+              }
+            })
+            .catch(() => {});
+        }}
+      />
     </div>
   );
 }

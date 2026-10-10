@@ -19,10 +19,12 @@ import {
   RefreshCw,
   Radio,
   Sliders,
+  Star,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import { supabase } from "@/lib/supabase/client";
 import { OrderStatus } from "@/types/database";
+import ReviewModal from "@/components/ReviewModal";
 
 interface TrackedOrder {
   orderNumber: string;
@@ -101,6 +103,7 @@ function TrackOrderContent() {
   const [currentStatus, setCurrentStatus] = useState<OrderStatus>("preparing");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(true);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   // Load Order Initial State
   useEffect(() => {
@@ -512,6 +515,31 @@ function TrackOrderContent() {
                 </div>
               </div>
 
+              {/* Customer Order Review Card (Phase 25) */}
+              <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[#d4af37]/30 text-center space-y-3 shadow-md">
+                <div className="flex items-center justify-center gap-1.5 text-[#d4af37]">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} className="w-5 h-5 fill-current" />
+                  ))}
+                </div>
+                <div className="space-y-0.5">
+                  <h3 className="text-sm font-serif font-bold text-[var(--text-main)]">
+                    How was your order?
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-sub)] font-light">
+                    Share your culinary dining experience with NEXORA Master Chefs.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReviewModalOpen(true)}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  <span>Write Review</span>
+                </button>
+              </div>
+
               {/* Navigation Back */}
               <Link
                 href="/menu"
@@ -524,6 +552,14 @@ function TrackOrderContent() {
           </div>
         </div>
       </main>
+
+      {/* Customer Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        orderId={order?.orderNumber}
+        defaultDishName={order?.items?.[0]?.name}
+      />
 
       {/* ==============================================================
           ADMIN STATUS CONTROLLER (SIMULATOR & REAL-TIME CONTROLLER)

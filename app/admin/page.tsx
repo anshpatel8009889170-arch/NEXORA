@@ -55,7 +55,7 @@ import {
   Store,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
-import { OrderStatus, MenuItem, Category, Offer, RestaurantSettings } from "@/types/database";
+import { OrderStatus, MenuItem, Category, Offer, RestaurantSettings, Review } from "@/types/database";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
 import { uploadDishImage } from "@/lib/storage";
 
@@ -137,6 +137,54 @@ const initialAdminOffers: Offer[] = [
     max_discount: 200,
     is_active: true,
     created_at: "2026-01-01T00:00:00.000Z",
+  },
+];
+
+const initialAdminReviews: Review[] = [
+  {
+    id: "rev_1",
+    customer_name: "Aanya Singhania",
+    dish_name: "24K Gold Saffron Shahi Tukda",
+    rating: 5,
+    comment: "Finest dessert in North India. Truly authentic royal gastronomy.",
+    is_approved: true,
+    created_at: "2026-10-09T18:30:00.000Z",
+  },
+  {
+    id: "rev_2",
+    customer_name: "Rohit Verma",
+    dish_name: "Burrata & Truffle Funghi Pizza",
+    rating: 5,
+    comment: "Thermal express delivery arrived steaming hot. Sourdough crust is world-class.",
+    is_approved: true,
+    created_at: "2026-10-09T19:15:00.000Z",
+  },
+  {
+    id: "rev_3",
+    customer_name: "Vikram Malhotra",
+    dish_name: "Truffle Malai Chaap",
+    rating: 5,
+    comment: "The clay oven smoked aroma and cashew marinade was absolutely exquisite. Grand royal dining!",
+    is_approved: true,
+    created_at: "2026-10-09T20:00:00.000Z",
+  },
+  {
+    id: "rev_4",
+    customer_name: "Pooja Sharma",
+    dish_name: "Dal Bukhara Grand Cru",
+    rating: 5,
+    comment: "Slow-cooked for 24 hours. Incredible depth of flavor and velvety richness.",
+    is_approved: true,
+    created_at: "2026-10-09T20:45:00.000Z",
+  },
+  {
+    id: "rev_5",
+    customer_name: "Aditya Saxena",
+    dish_name: "Paneer Lababdar",
+    rating: 5,
+    comment: "Food was amazing. Truly extraordinary pure-veg culinary art.",
+    is_approved: false,
+    created_at: "2026-10-10T08:15:00.000Z",
   },
 ];
 
@@ -286,6 +334,12 @@ export default function AdminDashboardPage() {
   const [settingsSavedMessage, setSettingsSavedMessage] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
 
+  // Reviews Moderation State (Phase 25)
+  const [reviewsList, setReviewsList] = useState<Review[]>(initialAdminReviews);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "pending" | "approved" | "hidden">("all");
+  const [reviewActionFeedback, setReviewActionFeedback] = useState<string | null>(null);
+  const [isReviewLoading, setIsReviewLoading] = useState<boolean>(false);
+
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -390,6 +444,33 @@ export default function AdminDashboardPage() {
             .catch(() => {});
         } catch (err) {
           console.warn("Error syncing restaurant settings:", err);
+        }
+
+        // Load / Sync Admin Reviews from localStorage & API (Phase 25)
+        try {
+          const storedReviews = localStorage.getItem("nexora_admin_reviews");
+          if (storedReviews) {
+            const parsed = JSON.parse(storedReviews);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setReviewsList(parsed);
+            } else {
+              localStorage.setItem("nexora_admin_reviews", JSON.stringify(initialAdminReviews));
+            }
+          } else {
+            localStorage.setItem("nexora_admin_reviews", JSON.stringify(initialAdminReviews));
+          }
+
+          fetch("/api/reviews?all=true")
+            .then((res) => res.json())
+            .then((json) => {
+              if (json.success && Array.isArray(json.reviews) && json.reviews.length > 0) {
+                setReviewsList(json.reviews);
+                localStorage.setItem("nexora_admin_reviews", JSON.stringify(json.reviews));
+              }
+            })
+            .catch(() => {});
+        } catch (err) {
+          console.warn("Error syncing admin reviews:", err);
         }
       } catch (err) {
         console.warn("Error syncing admin categories from storage:", err);
@@ -580,6 +661,82 @@ export default function AdminDashboardPage() {
       console.warn("Logo upload error:", err);
     } finally {
       setIsUploadingLogo(false);
+    }
+  };
+
+  // ==========================================================
+  // PHASE 25: REVIEWS MODERATION HANDLERS ([Approve], [Hide], [Delete])
+  // "Public website par sirf approved reviews."
+  // ==========================================================
+  const handleApproveReview = async (reviewId: string) => {
+    setIsReviewLoading(true);
+    const updated = reviewsList.map((r) =>
+      r.id === reviewId ? { ...r, is_approved: true } : r
+    );
+    setReviewsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_admin_reviews", JSON.stringify(updated));
+    }
+    setReviewActionFeedback("Review approved! It is now live on the public website.");
+    setTimeout(() => setReviewActionFeedback(null), 4000);
+
+    try {
+      await fetch("/api/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: reviewId, is_approved: true }),
+      });
+    } catch (err) {
+      console.warn("Failed to sync review approval:", err);
+    } finally {
+      setIsReviewLoading(false);
+    }
+  };
+
+  const handleHideReview = async (reviewId: string) => {
+    setIsReviewLoading(true);
+    const updated = reviewsList.map((r) =>
+      r.id === reviewId ? { ...r, is_approved: false } : r
+    );
+    setReviewsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_admin_reviews", JSON.stringify(updated));
+    }
+    setReviewActionFeedback("Review hidden from public website.");
+    setTimeout(() => setReviewActionFeedback(null), 4000);
+
+    try {
+      await fetch("/api/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: reviewId, is_approved: false }),
+      });
+    } catch (err) {
+      console.warn("Failed to sync review hide:", err);
+    } finally {
+      setIsReviewLoading(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this review?")) return;
+    setIsReviewLoading(true);
+    const updated = reviewsList.filter((r) => r.id !== reviewId);
+    setReviewsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_admin_reviews", JSON.stringify(updated));
+    }
+    setReviewActionFeedback("Review deleted successfully.");
+    setTimeout(() => setReviewActionFeedback(null), 4000);
+
+    try {
+      await fetch(`/api/reviews?id=${reviewId}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("Failed to sync review deletion:", err);
+    } finally {
+      setIsReviewLoading(false);
     }
   };
 
@@ -2195,53 +2352,229 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ==========================================================
-              TAB: REVIEWS
+              TAB: REVIEWS (PHASE 25: Reviews Moderation System)
+              "Public website par sirf approved reviews."
               ========================================================== */}
           {activeTab === "reviews" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="pb-4 border-b border-[var(--card-border)]">
-                <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                  Guest Reviews & Ratings
-                </h2>
-                <p className="text-xs text-[var(--text-sub)]">
-                  Verified patron feedback across all dishes.
-                </p>
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <Star className="w-5 h-5 text-[#d4af37]" />
+                    <span>Guest Reviews &amp; Moderation</span>
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Patron feedback across all pure-veg gourmet dishes. Public website par sirf approved reviews display honge.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-3">
+              {/* Action Feedback Banner */}
+              {reviewActionFeedback && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-in fade-in duration-200">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{reviewActionFeedback}</span>
+                </div>
+              )}
+
+              {/* Stats Overview */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-sub-light)] block font-semibold">
+                    Total Reviews
+                  </span>
+                  <span className="text-2xl font-serif font-bold text-[var(--text-main)] mt-1 block">
+                    {reviewsList.length}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-400 block font-semibold flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>Pending Moderation</span>
+                  </span>
+                  <span className="text-2xl font-serif font-bold text-amber-400 mt-1 block">
+                    {reviewsList.filter((r) => !r.is_approved).length}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[10px] uppercase tracking-wider text-emerald-400 block font-semibold flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    <span>Approved &amp; Live</span>
+                  </span>
+                  <span className="text-2xl font-serif font-bold text-emerald-400 mt-1 block">
+                    {reviewsList.filter((r) => r.is_approved).length}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[10px] uppercase tracking-wider text-[#d4af37] block font-semibold flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-current" />
+                    <span>Average Rating</span>
+                  </span>
+                  <span className="text-2xl font-serif font-bold text-gold-gradient mt-1 block">
+                    {reviewsList.length > 0
+                      ? (
+                          reviewsList.reduce((acc, r) => acc + (r.rating || 5), 0) /
+                          reviewsList.length
+                        ).toFixed(1)
+                      : "5.0"}{" "}
+                    <span className="text-xs text-[var(--text-sub)] font-normal font-sans">/ 5</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2 border-b border-[var(--card-border)] pb-3">
                 {[
+                  { id: "all", label: `All (${reviewsList.length})` },
                   {
-                    name: "Aanya Singhania",
-                    dish: "24K Gold Saffron Shahi Tukda",
-                    comment: "Finest dessert in North India. Truly authentic royal gastronomy.",
-                    rating: 5,
+                    id: "pending",
+                    label: `Pending Moderation (${reviewsList.filter((r) => !r.is_approved).length})`,
+                    highlight: reviewsList.filter((r) => !r.is_approved).length > 0,
                   },
                   {
-                    name: "Rohit Verma",
-                    dish: "Burrata & Truffle Funghi Pizza",
-                    comment: "Thermal express delivery arrived steaming hot. Sourdough crust is world-class.",
-                    rating: 5,
+                    id: "approved",
+                    label: `Approved (${reviewsList.filter((r) => r.is_approved).length})`,
                   },
-                ].map((rev, i) => (
-                  <div
-                    key={i}
-                    className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-2"
+                  {
+                    id: "hidden",
+                    label: `Hidden (${reviewsList.filter((r) => !r.is_approved).length})`,
+                  },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setReviewFilter(tab.id as any)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      reviewFilter === tab.id
+                        ? "bg-gold-gradient text-black shadow-md font-bold"
+                        : tab.highlight
+                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20"
+                        : "bg-[var(--card-bg)] text-[var(--text-sub)] border border-[var(--card-border)] hover:border-[#d4af37]/40 hover:text-[var(--text-main)]"
+                    }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[var(--text-main)]">
-                        {rev.name} &bull; <span className="text-[#d4af37]">{rev.dish}</span>
-                      </span>
-                      <div className="flex items-center text-[#d4af37]">
-                        {[...Array(rev.rating)].map((_, idx) => (
-                          <Star key={idx} className="w-3.5 h-3.5 fill-current" />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-xs text-[var(--text-sub)] italic font-light">
-                      &ldquo;{rev.comment}&rdquo;
-                    </p>
-                  </div>
+                    <span>{tab.label}</span>
+                  </button>
                 ))}
+              </div>
+
+              {/* Reviews List */}
+              <div className="space-y-4">
+                {reviewsList
+                  .filter((rev) => {
+                    if (reviewFilter === "pending" || reviewFilter === "hidden") return !rev.is_approved;
+                    if (reviewFilter === "approved") return rev.is_approved;
+                    return true;
+                  })
+                  .map((rev) => {
+                    const formattedDate =
+                      typeof rev.created_at === "string"
+                        ? rev.created_at.split("T")[0]
+                        : "Recent";
+
+                    return (
+                      <div
+                        key={rev.id}
+                        className="p-5 sm:p-6 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4 hover:border-[#d4af37]/30 transition-all shadow-sm"
+                      >
+                        {/* Top: Patron + Rating + Approval Status */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-[var(--text-main)]">
+                              {rev.customer_name || "Valued Patron"}
+                            </span>
+                            {rev.dish_name && (
+                              <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/20 font-medium">
+                                {rev.dish_name}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {/* Star Rating */}
+                            <div className="flex items-center gap-0.5 text-[#d4af37]">
+                              {[...Array(rev.rating || 5)].map((_, idx) => (
+                                <Star key={idx} className="w-4 h-4 fill-current" />
+                              ))}
+                            </div>
+
+                            {/* Approval Badge */}
+                            {rev.is_approved ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                <span>Approved</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>Pending</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Comment Text */}
+                        <blockquote className="p-3.5 rounded-xl bg-[var(--section-alt)] border-l-2 border-[#d4af37] text-xs sm:text-sm text-[var(--text-sub)] italic font-light leading-relaxed">
+                          &ldquo;{rev.comment}&rdquo;
+                        </blockquote>
+
+                        {/* Bottom Row: Date + Action Buttons [Approve] [Hide] [Delete] */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[var(--card-border)] text-xs">
+                          <span className="text-[11px] text-[var(--text-sub-light)] font-mono">
+                            Submitted on {formattedDate}
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {!rev.is_approved ? (
+                              <button
+                                type="button"
+                                disabled={isReviewLoading}
+                                onClick={() => handleApproveReview(rev.id)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Approve</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isReviewLoading}
+                                onClick={() => handleHideReview(rev.id)}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                              >
+                                <EyeOff className="w-3.5 h-3.5" />
+                                <span>Hide</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              disabled={isReviewLoading}
+                              onClick={() => handleDeleteReview(rev.id)}
+                              className="p-2 rounded-xl text-[var(--text-sub-light)] hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
+                              title="Delete Review"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {reviewsList.filter((rev) => {
+                  if (reviewFilter === "pending" || reviewFilter === "hidden") return !rev.is_approved;
+                  if (reviewFilter === "approved") return rev.is_approved;
+                  return true;
+                }).length === 0 && (
+                  <div className="text-center py-12 border border-dashed border-[var(--card-border)] rounded-2xl space-y-2">
+                    <Star className="w-8 h-8 text-[var(--text-sub-light)] mx-auto opacity-40" />
+                    <p className="text-xs text-[var(--text-sub)]">No reviews found under this filter.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
