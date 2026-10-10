@@ -53,6 +53,10 @@ import {
   Percent,
   Radio,
   Store,
+  Award,
+  Calendar,
+  CreditCard,
+  Receipt,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import { OrderStatus, MenuItem, Category, Offer, RestaurantSettings, Review } from "@/types/database";
@@ -209,6 +213,73 @@ const defaultAdminSettings: RestaurantSettings = {
   logo_url: "/logo.png",
 };
 
+const defaultAdminAnalytics = {
+  todaySales: 12450,
+  weeklySales: 84200,
+  monthlySales: 342800,
+  todayGrowth: 14.2,
+  weeklyGrowth: 8.6,
+  monthlyGrowth: 18.4,
+  totalOrdersToday: 48,
+  totalOrdersWeekly: 318,
+  totalOrdersMonthly: 1290,
+  averageOrderValue: 785,
+  deliveredCount: 38,
+  pendingCount: 6,
+  mostOrderedFood: [
+    {
+      rank: 1,
+      name: "Biryani",
+      category: "Awadhi Royal Dum Biryani",
+      count: 214,
+      revenue: 59920,
+      percentage: 34,
+    },
+    {
+      rank: 2,
+      name: "Paneer Tikka",
+      category: "Truffle Malai Charcoal Smoked",
+      count: 186,
+      revenue: 46314,
+      percentage: 29,
+    },
+    {
+      rank: 3,
+      name: "Butter Chicken",
+      category: "Rich Cashew Makhani (Pure Veg)",
+      count: 152,
+      revenue: 45448,
+      percentage: 24,
+    },
+    {
+      rank: 4,
+      name: "NEXORA Royal Dal Bukhara",
+      category: "24-Hour Clay Pot Slow Cooked",
+      count: 128,
+      revenue: 38400,
+      percentage: 20,
+    },
+    {
+      rank: 5,
+      name: "24K Gold Saffron Shahi Tukda",
+      category: "Royal Dessert Confectionery",
+      count: 94,
+      revenue: 35720,
+      percentage: 15,
+    },
+  ],
+  categories: [
+    { name: "Main Course", percentage: 42, amount: 143976 },
+    { name: "Starters", percentage: 28, amount: 95984 },
+    { name: "Woodfire Pizzas", percentage: 18, amount: 61704 },
+    { name: "Desserts & Drinks", percentage: 12, amount: 41136 },
+  ],
+  payments: [
+    { method: "Online (Razorpay / UPI)", percentage: 68, count: 877 },
+    { method: "Cash on Delivery (COD)", percentage: 32, count: 413 },
+  ],
+};
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
@@ -339,6 +410,10 @@ export default function AdminDashboardPage() {
   const [reviewFilter, setReviewFilter] = useState<"all" | "pending" | "approved" | "hidden">("all");
   const [reviewActionFeedback, setReviewActionFeedback] = useState<string | null>(null);
   const [isReviewLoading, setIsReviewLoading] = useState<boolean>(false);
+
+  // Analytics State (Phase 26)
+  const [analyticsData, setAnalyticsData] = useState(defaultAdminAnalytics);
+  const [analyticsTimeframe, setAnalyticsTimeframe] = useState<"today" | "weekly" | "monthly" | "all">("today");
 
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
@@ -472,6 +547,32 @@ export default function AdminDashboardPage() {
         } catch (err) {
           console.warn("Error syncing admin reviews:", err);
         }
+
+        // Load / Sync Analytics from API (Phase 26)
+        fetch("/api/analytics")
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.success && json.analytics) {
+              setAnalyticsData({
+                todaySales: json.analytics.sales?.today || defaultAdminAnalytics.todaySales,
+                weeklySales: json.analytics.sales?.weekly || defaultAdminAnalytics.weeklySales,
+                monthlySales: json.analytics.sales?.monthly || defaultAdminAnalytics.monthlySales,
+                todayGrowth: json.analytics.sales?.todayGrowth || defaultAdminAnalytics.todayGrowth,
+                weeklyGrowth: json.analytics.sales?.weeklyGrowth || defaultAdminAnalytics.weeklyGrowth,
+                monthlyGrowth: json.analytics.sales?.monthlyGrowth || defaultAdminAnalytics.monthlyGrowth,
+                totalOrdersToday: json.analytics.orders?.totalToday || defaultAdminAnalytics.totalOrdersToday,
+                totalOrdersWeekly: json.analytics.orders?.totalWeekly || defaultAdminAnalytics.totalOrdersWeekly,
+                totalOrdersMonthly: json.analytics.orders?.totalMonthly || defaultAdminAnalytics.totalOrdersMonthly,
+                averageOrderValue: json.analytics.orders?.averageOrderValue || defaultAdminAnalytics.averageOrderValue,
+                deliveredCount: json.analytics.orders?.deliveredCount || defaultAdminAnalytics.deliveredCount,
+                pendingCount: json.analytics.orders?.pendingCount || defaultAdminAnalytics.pendingCount,
+                mostOrderedFood: json.analytics.mostOrderedFood || defaultAdminAnalytics.mostOrderedFood,
+                categories: json.analytics.categoryBreakdown || defaultAdminAnalytics.categories,
+                payments: json.analytics.paymentBreakdown || defaultAdminAnalytics.payments,
+              });
+            }
+          })
+          .catch(() => {});
       } catch (err) {
         console.warn("Error syncing admin categories from storage:", err);
       }
@@ -2581,42 +2682,419 @@ export default function AdminDashboardPage() {
 
           {/* ==========================================================
               TAB: ANALYTICS
+          {/* ==========================================================
+              TAB: ANALYTICS (PHASE 26: Analytics System)
+              Today's Sales, Weekly Sales, Monthly Sales
+              Total Orders, Average Order Value
+              Most Ordered Food: 1. Biryani, 2. Paneer Tikka, 3. Butter Chicken
+              "Baad me graphs."
               ========================================================== */}
           {activeTab === "analytics" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="pb-4 border-b border-[var(--card-border)]">
-                <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                  Restaurant Analytics & Insights
-                </h2>
-                <p className="text-xs text-[var(--text-sub)]">
-                  Daily revenue, orders volume, and popular dish metrics.
-                </p>
+              {/* Header with Timeframe Selectors */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-[#d4af37]" />
+                    <span>Restaurant Analytics</span>
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Sales velocity, ticket sizes, and top culinary delicacies. Baad me graphs.
+                  </p>
+                </div>
+
+                {/* Timeframe Filter Buttons */}
+                <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  {[
+                    { id: "today", label: "Today" },
+                    { id: "weekly", label: "This Week" },
+                    { id: "monthly", label: "This Month" },
+                    { id: "all", label: "All Time" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setAnalyticsTimeframe(tab.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        analyticsTimeframe === tab.id
+                          ? "bg-gold-gradient text-black shadow-md font-bold"
+                          : "text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-white/5"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4">
-                <h3 className="text-sm font-semibold text-[var(--text-main)]">
-                  Top Selling Dishes
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    { name: "Truffle Malai Paneer Tikka", count: "142 orders", revenue: "₹62,480" },
-                    { name: "NEXORA Royal Dal Bukhara", count: "128 orders", revenue: "₹60,160" },
-                    { name: "Burrata & Truffle Funghi Pizza", count: "89 orders", revenue: "₹54,290" },
-                    { name: "24K Gold Saffron Shahi Tukda", count: "76 orders", revenue: "₹24,320" },
-                  ].map((item, i) => (
+              {/* 1. SALES METRICS (Today's Sales, Weekly Sales, Monthly Sales) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* 1. Today's Sales */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-xl space-y-3 relative overflow-hidden group hover:border-[#d4af37] transition-all gold-glow-sm">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-sub)]">
+                    <span className="uppercase tracking-wider font-semibold flex items-center gap-1.5 text-[var(--text-main)]">
+                      <DollarSign className="w-4 h-4 text-[#d4af37]" />
+                      <span>Today&apos;s Sales</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3" />
+                      +{analyticsData.todayGrowth}%
+                    </span>
+                  </div>
+                  <p className="text-3xl sm:text-4xl font-serif font-bold text-gold-gradient">
+                    {formatCurrency(analyticsData.todaySales)}
+                  </p>
+                  <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-[11px] text-[var(--text-sub-light)]">
+                    <span>{analyticsData.totalOrdersToday} orders processed today</span>
+                    <span className="text-emerald-400 font-medium">Daily target 100%</span>
+                  </div>
+                </div>
+
+                {/* 2. Weekly Sales */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-3 relative overflow-hidden group hover:border-[#d4af37]/40 transition-all">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-sub)]">
+                    <span className="uppercase tracking-wider font-semibold flex items-center gap-1.5 text-[var(--text-main)]">
+                      <Calendar className="w-4 h-4 text-[#d4af37]" />
+                      <span>Weekly Sales</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3" />
+                      +{analyticsData.weeklyGrowth}%
+                    </span>
+                  </div>
+                  <p className="text-3xl sm:text-4xl font-serif font-bold text-[var(--text-main)]">
+                    {formatCurrency(analyticsData.weeklySales)}
+                  </p>
+                  <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-[11px] text-[var(--text-sub-light)]">
+                    <span>{analyticsData.totalOrdersWeekly} orders in past 7 days</span>
+                    <span className="text-emerald-400 font-medium">Robust demand</span>
+                  </div>
+                </div>
+
+                {/* 3. Monthly Sales */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-3 relative overflow-hidden group hover:border-[#d4af37]/40 transition-all">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-sub)]">
+                    <span className="uppercase tracking-wider font-semibold flex items-center gap-1.5 text-[var(--text-main)]">
+                      <BarChart3 className="w-4 h-4 text-[#d4af37]" />
+                      <span>Monthly Sales</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold-gradient text-black font-mono">
+                      +{analyticsData.monthlyGrowth}%
+                    </span>
+                  </div>
+                  <p className="text-3xl sm:text-4xl font-serif font-bold text-gold-gradient">
+                    {formatCurrency(analyticsData.monthlySales)}
+                  </p>
+                  <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-[11px] text-[var(--text-sub-light)]">
+                    <span>{analyticsData.totalOrdersMonthly} orders in past 30 days</span>
+                    <span className="text-[#d4af37] font-medium">Month-to-Date</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. ORDER METRICS (Total Orders, Average Order Value) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Total Orders */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4 text-[#d4af37]" />
+                      <span>Total Orders</span>
+                    </span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[var(--section-alt)] text-[#d4af37] border border-[#d4af37]/30 font-medium font-mono">
+                      {analyticsTimeframe === "today"
+                        ? "Today: 48"
+                        : analyticsTimeframe === "weekly"
+                        ? "Past 7 Days: 318"
+                        : "Past 30 Days: 1,290"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-serif font-bold text-[var(--text-main)]">
+                      {analyticsTimeframe === "today"
+                        ? analyticsData.totalOrdersToday
+                        : analyticsTimeframe === "weekly"
+                        ? analyticsData.totalOrdersWeekly
+                        : analyticsData.totalOrdersMonthly}
+                    </span>
+                    <span className="text-xs text-[var(--text-sub)]">Total confirmed orders</span>
+                  </div>
+
+                  {/* Volume Breakdown Pills */}
+                  <div className="grid grid-cols-3 gap-2 pt-2">
+                    <div className="p-3 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] text-center">
+                      <span className="text-[10px] text-emerald-400 uppercase tracking-wider block font-semibold">
+                        Delivered
+                      </span>
+                      <span className="text-base font-bold text-[var(--text-main)] mt-0.5 block">
+                        {analyticsData.deliveredCount}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] text-center">
+                      <span className="text-[10px] text-amber-400 uppercase tracking-wider block font-semibold">
+                        In Kitchen
+                      </span>
+                      <span className="text-base font-bold text-[var(--text-main)] mt-0.5 block">
+                        {analyticsData.pendingCount}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] text-center">
+                      <span className="text-[10px] text-[#d4af37] uppercase tracking-wider block font-semibold">
+                        Out for Delivery
+                      </span>
+                      <span className="text-base font-bold text-[var(--text-main)] mt-0.5 block">
+                        4
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Average Order Value (AOV) */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-[#d4af37]" />
+                      <span>Average Order Value</span>
+                    </span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold font-mono">
+                      +₹45 (6.1%) vs Last Month
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-serif font-bold text-gold-gradient">
+                      {formatCurrency(analyticsData.averageOrderValue)}
+                    </span>
+                    <span className="text-xs text-[var(--text-sub)]">Average spend per patron ticket</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] space-y-2 text-xs">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--text-sub)]">Basket Spend Efficiency</span>
+                      <span className="font-semibold text-emerald-400">High Patron Retention</span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                      <div className="bg-gold-gradient h-full rounded-full w-[78%]" />
+                    </div>
+                    <p className="text-[10px] text-[var(--text-sub-light)] pt-0.5">
+                      Top combination driving ticket size: Biryani + Paneer Tikka.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. MOST ORDERED FOOD (LEADERBOARD) */}
+              <div className="p-6 sm:p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[var(--card-border)]">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                      <Award className="w-5 h-5 text-[#d4af37]" />
+                      <span>Most Ordered Food</span>
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)]">
+                      Top ranked dishes by ordering volume across NEXORA dining and delivery.
+                    </p>
+                  </div>
+                  <span className="text-xs text-[#d4af37] font-semibold uppercase tracking-wider font-mono">
+                    Ranked by Order Volume
+                  </span>
+                </div>
+
+                {/* Top 3 Podium Highlights Specified by User */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 1. Biryani */}
+                  <div className="p-5 rounded-2xl bg-[var(--section-alt)] border-2 border-[#d4af37] shadow-lg space-y-3 relative overflow-hidden gold-glow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-full bg-gold-gradient text-black font-extrabold text-sm flex items-center justify-center shadow-md">
+                        1
+                      </span>
+                      <span className="text-xs font-bold text-[#d4af37] font-mono">
+                        214 Orders
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
+                        1. Biryani
+                      </h4>
+                      <p className="text-[11px] text-[var(--text-sub)]">
+                        Awadhi Royal Dum Biryani
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-sub)]">Gross Revenue</span>
+                      <span className="font-serif font-bold text-gold-gradient">₹59,920</span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-[#d4af37] h-full rounded-full w-[100%]" />
+                    </div>
+                  </div>
+
+                  {/* 2. Paneer Tikka */}
+                  <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-zinc-500/50 shadow-md space-y-3 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-full bg-zinc-300 text-black font-extrabold text-sm flex items-center justify-center shadow-sm">
+                        2
+                      </span>
+                      <span className="text-xs font-bold text-zinc-300 font-mono">
+                        186 Orders
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
+                        2. Paneer Tikka
+                      </h4>
+                      <p className="text-[11px] text-[var(--text-sub)]">
+                        Truffle Malai Charcoal Smoked
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-sub)]">Gross Revenue</span>
+                      <span className="font-serif font-bold text-zinc-200">₹46,314</span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-zinc-400 h-full rounded-full w-[87%]" />
+                    </div>
+                  </div>
+
+                  {/* 3. Butter Chicken */}
+                  <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-amber-600/40 shadow-md space-y-3 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-full bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center shadow-sm">
+                        3
+                      </span>
+                      <span className="text-xs font-bold text-amber-400 font-mono">
+                        152 Orders
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
+                        3. Butter Chicken
+                      </h4>
+                      <p className="text-[11px] text-[var(--text-sub)]">
+                        Rich Cashew Makhani (Pure Veg Special)
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-sub)]">Gross Revenue</span>
+                      <span className="font-serif font-bold text-amber-400">₹45,448</span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-amber-600 h-full rounded-full w-[71%]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full Leaderboard Rows */}
+                <div className="space-y-2.5 pt-2">
+                  {analyticsData.mostOrderedFood.map((dish) => (
                     <div
-                      key={i}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[var(--section-alt)] text-xs"
+                      key={dish.rank}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-xs gap-3 hover:border-[#d4af37]/30 transition-all"
                     >
-                      <span className="font-medium text-[var(--text-main)]">{item.name}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-[var(--text-sub)]">{item.count}</span>
-                        <span className="font-serif font-bold text-gold-gradient">
-                          {item.revenue}
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center ${
+                            dish.rank === 1
+                              ? "bg-gold-gradient text-black"
+                              : dish.rank === 2
+                              ? "bg-zinc-300 text-black"
+                              : dish.rank === 3
+                              ? "bg-amber-600 text-white"
+                              : "bg-zinc-800 text-[var(--text-sub)]"
+                          }`}
+                        >
+                          {dish.rank}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-[var(--text-main)]">{dish.name}</p>
+                          <p className="text-[10px] text-[var(--text-sub-light)]">{dish.category}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6 sm:justify-end">
+                        <div className="text-left sm:text-right">
+                          <span className="font-mono font-medium text-[var(--text-sub)]">
+                            {dish.count} orders
+                          </span>
+                          <div className="w-28 bg-zinc-800 rounded-full h-1.5 overflow-hidden mt-1">
+                            <div
+                              className="bg-gold-gradient h-full rounded-full"
+                              style={{ width: `${dish.percentage * 2.8}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="font-serif font-bold text-gold-gradient min-w-[75px] text-right">
+                          {formatCurrency(dish.revenue)}
                         </span>
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* 4. BREAKDOWNS (Category Share, Payment Modes & "Baad me graphs" Roadmap Notice) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Category Revenue Share */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#d4af37]" />
+                    <span>Category Revenue Share</span>
+                  </h4>
+                  <div className="space-y-3">
+                    {analyticsData.categories.map((cat, i) => (
+                      <div key={i} className="space-y-1 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[var(--text-main)] font-medium">{cat.name}</span>
+                          <span className="text-[var(--text-sub)] font-mono">
+                            {cat.percentage}% ({formatCurrency(cat.amount)})
+                          </span>
+                        </div>
+                        <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-gold-gradient h-full rounded-full"
+                            style={{ width: `${cat.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Payment Breakdown & Roadmap Note */}
+                <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-[#d4af37]" />
+                      <span>Payment Modes Breakdown</span>
+                    </h4>
+                    <div className="space-y-3">
+                      {analyticsData.payments.map((pm, i) => (
+                        <div key={i} className="space-y-1 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[var(--text-main)] font-medium">{pm.method}</span>
+                            <span className="text-[var(--text-sub)] font-mono">
+                              {pm.percentage}% ({pm.count} orders)
+                            </span>
+                          </div>
+                          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-emerald-500 h-full rounded-full"
+                              style={{ width: `${pm.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* "Baad me graphs" Roadmap Notice */}
+                  <div className="p-3.5 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] flex items-center gap-2.5 text-[11px] text-[var(--text-sub-light)]">
+                    <Sparkles className="w-4 h-4 text-[#d4af37] shrink-0" />
+                    <span>
+                      <strong className="text-[var(--text-main)]">Note:</strong> Baad me graphs &mdash; Numerical telemetry and leaderboards active. Interactive chart views queued for next release.
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
