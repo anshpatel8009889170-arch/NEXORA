@@ -31,6 +31,9 @@ import {
   MapPin,
   Flame,
   ArrowRight,
+  Check,
+  X,
+  ArrowDown,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import { OrderStatus } from "@/types/database";
@@ -75,19 +78,21 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
 
-  // Sample Live Orders for Management
+  const [orderFilter, setOrderFilter] = useState<string>("all");
+
+  // Sample Live Orders for Management (Matching Phase 18 specifications)
   const [ordersList, setOrdersList] = useState<AdminOrder[]>([
     {
-      id: "ord_1",
+      id: "ord_1048",
       orderNumber: "ORD-1048",
       customerName: "Ansh Patel",
       phone: "+91 83038 90056",
-      items: ["Truffle Malai Paneer Tikka × 2", "NEXORA Royal Dal Bukhara × 1"],
-      total: 1350,
+      items: ["2 × Biryani", "1 × Paneer Tikka"],
+      total: 847,
       status: "pending",
       paymentMethod: "Online (Razorpay)",
       paymentStatus: "paid",
-      time: "2 mins ago",
+      time: "Just now",
       address: "Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe",
     },
     {
@@ -370,171 +375,431 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Live Kitchen & Orders Quick Queue */}
-              <div className="p-6 sm:p-7 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
-                  <div>
-                    <h2 className="text-lg font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
-                      <ChefHat className="w-5 h-5 text-[#d4af37]" />
-                      <span>Live Orders Queue</span>
-                    </h2>
-                    <p className="text-xs text-[var(--text-sub)] pt-0.5">
-                      Change status to automatically update the customer live tracking screen.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("orders")}
-                    className="text-xs text-[#d4af37] hover:underline flex items-center gap-1 font-semibold uppercase tracking-wider"
-                  >
-                    <span>View All Orders</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Order List Cards */}
-                <div className="space-y-4">
-                  {ordersList.map((ord) => (
-                    <div
-                      key={ord.id}
-                      className="p-5 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] hover:border-[#d4af37]/40 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-sm text-[var(--text-main)]">
-                            {ord.orderNumber}
-                          </span>
-                          <span className="text-xs text-[var(--text-sub)]">
-                            &bull; {ord.time}
-                          </span>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                              ord.status === "pending"
-                                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                                : ord.status === "preparing"
-                                ? "bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30"
-                                : ord.status === "ready"
-                                ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                                : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                            }`}
-                          >
-                            {ord.status}
-                          </span>
-                        </div>
-
-                        <p className="text-xs font-semibold text-[var(--text-main)]">
-                          {ord.customerName} &bull;{" "}
-                          <span className="font-mono text-[var(--text-sub)]">{ord.phone}</span>
-                        </p>
-                        <p className="text-xs text-[var(--text-sub)] line-clamp-1">
-                          {ord.items.join(", ")}
-                        </p>
-                        <p className="text-[11px] text-[var(--text-sub-light)] flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-[#d4af37]" />
-                          <span>{ord.address}</span>
-                        </p>
+              {/* ==============================================================
+                  PHASE 18 — DASHBOARD NEW ORDERS SECTION
+                  ============================================================== */}
+              <div className="space-y-6">
+                <div className="p-6 sm:p-7 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-xl space-y-6 gold-glow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
+                        <Flame className="w-5 h-5 animate-pulse" />
                       </div>
-
-                      {/* Right Status Controls */}
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:self-center">
-                        <div className="text-left sm:text-right">
-                          <span className="text-xs text-[var(--text-sub)] block">
-                            {ord.paymentMethod}
-                          </span>
-                          <span className="text-lg font-serif font-bold text-gold-gradient">
-                            {formatCurrency(ord.total)}
-                          </span>
-                        </div>
-
-                        {/* Interactive Status Advancer */}
-                        <div className="flex items-center gap-1.5 bg-[var(--card-bg)] p-1 rounded-xl border border-[var(--card-border)]">
-                          {(["pending", "accepted", "preparing", "ready", "delivered"] as OrderStatus[]).map(
-                            (st) => (
-                              <button
-                                key={st}
-                                type="button"
-                                onClick={() => handleUpdateOrderStatus(ord.id, st)}
-                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                                  ord.status === st
-                                    ? "bg-gold-gradient text-black shadow-sm"
-                                    : "text-[var(--text-sub)] hover:text-[var(--text-main)]"
-                                }`}
-                              >
-                                {st === "pending"
-                                  ? "Placed"
-                                  : st === "accepted"
-                                  ? "Accept"
-                                  : st === "preparing"
-                                  ? "Prep"
-                                  : st === "ready"
-                                  ? "Ready"
-                                  : "Delivered"}
-                              </button>
-                            )
-                          )}
-                        </div>
+                      <div>
+                        <span className="text-[10px] uppercase tracking-[0.25em] text-amber-400 font-bold block">
+                          Incoming Queue
+                        </span>
+                        <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
+                          NEW ORDERS
+                        </h2>
                       </div>
                     </div>
-                  ))}
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("orders")}
+                      className="text-xs text-[#d4af37] hover:underline flex items-center gap-1 font-semibold uppercase tracking-wider"
+                    >
+                      <span>Pipeline Management</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Filter only new/pending orders, or show empty notice */}
+                  {ordersList.filter((o) => o.status === "pending").length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {ordersList
+                        .filter((o) => o.status === "pending")
+                        .map((ord) => (
+                          <div
+                            key={ord.id}
+                            className="p-5 rounded-2xl bg-[var(--section-alt)] border-2 border-[#d4af37]/50 shadow-md space-y-4 hover:border-[#d4af37] transition-all"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <span className="font-mono font-bold text-lg text-[var(--text-main)] block">
+                                  #{ord.orderNumber.replace(/^ORD-/, "")}
+                                </span>
+                                <span className="text-[11px] text-[var(--text-sub)]">
+                                  {ord.customerName} &bull; {ord.time}
+                                </span>
+                              </div>
+                              <span className="text-xl font-serif font-bold text-gold-gradient">
+                                {formatCurrency(ord.total)}
+                              </span>
+                            </div>
+
+                            {/* Dishes List (Matches user specification: 2 x Biryani, 1 x Paneer Tikka) */}
+                            <div className="py-2.5 px-3.5 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-1">
+                              {ord.items.map((item, idx) => (
+                                <p
+                                  key={idx}
+                                  className="text-xs font-semibold text-[var(--text-main)]"
+                                >
+                                  {item}
+                                </p>
+                              ))}
+                            </div>
+
+                            <p className="text-[11px] text-[var(--text-sub-light)] flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-[#d4af37] shrink-0" />
+                              <span className="line-clamp-1">{ord.address}</span>
+                            </p>
+
+                            {/* Two Primary Action Buttons: [ ACCEPT ] & [ REJECT ] */}
+                            <div className="grid grid-cols-2 gap-2.5 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(ord.id, "accepted")}
+                                className="py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5"
+                              >
+                                <Check className="w-4 h-4 stroke-[3]" />
+                                <span>ACCEPT</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(ord.id, "cancelled")}
+                                className="py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-[var(--card-bg)] text-rose-400 border border-rose-500/30 hover:bg-rose-500/10 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <X className="w-4 h-4" />
+                                <span>REJECT</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center space-y-2">
+                      <p className="text-xs text-[var(--text-sub)]">
+                        No pending new orders. All orders have been accepted!
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateOrderStatus("ord_1048", "pending")}
+                        className="text-xs text-[#d4af37] hover:underline"
+                      >
+                        Reset Demo #1048 to New
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Live In-Progress Orders (Accepted, Preparing, Ready) */}
+                <div className="p-6 sm:p-7 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-6">
+                  <div className="flex items-center justify-between pb-3 border-b border-[var(--card-border)]">
+                    <h2 className="text-base font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                      <ChefHat className="w-4 h-4 text-[#d4af37]" />
+                      <span>In-Progress Kitchen Orders</span>
+                    </h2>
+                    <span className="text-xs text-[#d4af37] font-semibold uppercase tracking-wider">
+                      Live Kitchen
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {ordersList
+                      .filter((o) => o.status !== "pending" && o.status !== "cancelled")
+                      .map((ord) => (
+                        <div
+                          key={ord.id}
+                          className="p-4 sm:p-5 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2.5">
+                              <span className="font-mono font-bold text-sm text-[var(--text-main)]">
+                                #{ord.orderNumber.replace(/^ORD-/, "")}
+                              </span>
+                              <span className="text-xs text-[var(--text-sub)]">
+                                &bull; {ord.time}
+                              </span>
+
+                              {/* Current Stage Badge */}
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                  ord.status === "accepted"
+                                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                    : ord.status === "preparing"
+                                    ? "bg-[#d4af37]/20 text-[#d4af37] border-[#d4af37]/40"
+                                    : ord.status === "ready"
+                                    ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                                    : ord.status === "out_for_delivery"
+                                    ? "bg-purple-500/15 text-purple-400 border-purple-500/30"
+                                    : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                }`}
+                              >
+                                {ord.status.replace(/_/g, " ")}
+                              </span>
+                            </div>
+
+                            <p className="text-xs font-semibold text-[var(--text-main)]">
+                              {ord.items.join(", ")}
+                            </p>
+                            <p className="text-[11px] text-[var(--text-sub)]">
+                              {ord.customerName} ({ord.phone}) &bull;{" "}
+                              <span className="text-[#d4af37] font-semibold">
+                                {formatCurrency(ord.total)}
+                              </span>
+                            </p>
+                          </div>
+
+                          {/* Next Transition Action Button */}
+                          <div className="flex items-center gap-2">
+                            {ord.status === "accepted" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(ord.id, "preparing")}
+                                className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md flex items-center gap-1.5"
+                              >
+                                <ChefHat className="w-3.5 h-3.5" />
+                                <span>PREPARING</span>
+                              </button>
+                            )}
+
+                            {ord.status === "preparing" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(ord.id, "ready")}
+                                className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-blue-500 text-white hover:bg-blue-600 shadow-md flex items-center gap-1.5"
+                              >
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>READY</span>
+                              </button>
+                            )}
+
+                            {ord.status === "ready" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(ord.id, "out_for_delivery")}
+                                className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-purple-500 text-white hover:bg-purple-600 shadow-md flex items-center gap-1.5"
+                              >
+                                <Bike className="w-3.5 h-3.5" />
+                                <span>OUT FOR DELIVERY</span>
+                              </button>
+                            )}
+
+                            {ord.status === "out_for_delivery" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOrderStatus(ord.id, "delivered")}
+                                className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-500 text-black hover:bg-emerald-400 shadow-md flex items-center gap-1.5"
+                              >
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>DELIVERED</span>
+                              </button>
+                            )}
+
+                            {ord.status === "delivered" && (
+                              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                                <CheckCircle2 className="w-4 h-4" /> Fulfilled
+                              </span>
+                            )}
+
+                            <Link
+                              href={`/track-order?orderId=${ord.orderNumber}`}
+                              className="p-2 rounded-xl bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-[#d4af37] border border-[var(--card-border)]"
+                              title="Customer live view"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
           {/* ==========================================================
-              TAB: ORDERS (FULL MANAGEMENT)
+              TAB: ORDERS (FULL KITCHEN LIFECYCLE MANAGEMENT)
               ========================================================== */}
           {activeTab === "orders" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
-                <div>
-                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                    Orders Management
-                  </h2>
-                  <p className="text-xs text-[var(--text-sub)]">
-                    All incoming and fulfilled restaurant orders.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[#d4af37] font-semibold">
-                    Total: {ordersList.length} Orders
-                  </span>
-                </div>
+              {/* Lifecycle Breadcrumb Overview */}
+              <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                <span className="font-bold text-amber-400">NEW</span>
+                <span className="text-[var(--text-sub-light)]">&rarr;</span>
+                <span className="font-bold text-amber-300">ACCEPTED</span>
+                <span className="text-[var(--text-sub-light)]">&rarr;</span>
+                <span className="font-bold text-[#d4af37]">PREPARING</span>
+                <span className="text-[var(--text-sub-light)]">&rarr;</span>
+                <span className="font-bold text-blue-400">READY</span>
+                <span className="text-[var(--text-sub-light)]">&rarr;</span>
+                <span className="font-bold text-purple-400">OUT FOR DELIVERY</span>
+                <span className="text-[var(--text-sub-light)]">&rarr;</span>
+                <span className="font-bold text-emerald-400">DELIVERED</span>
               </div>
 
-              <div className="space-y-3">
-                {ordersList.map((ord) => (
-                  <div
-                    key={ord.id}
-                    className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex flex-col md:flex-row md:items-center justify-between gap-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-sm">{ord.orderNumber}</span>
-                        <span className="text-xs text-[var(--text-sub)]">&bull; {ord.time}</span>
-                      </div>
-                      <p className="text-xs font-semibold text-[var(--text-main)] pt-1">
-                        {ord.customerName} ({ord.phone})
-                      </p>
-                      <p className="text-xs text-[var(--text-sub)] pt-0.5">
-                        {ord.items.join(", ")}
-                      </p>
-                    </div>
+              {/* Stage Filter Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "all", label: "All Orders" },
+                  { key: "pending", label: "New Orders" },
+                  { key: "accepted", label: "Accepted" },
+                  { key: "preparing", label: "Preparing" },
+                  { key: "ready", label: "Ready" },
+                  { key: "out_for_delivery", label: "Out for Delivery" },
+                  { key: "delivered", label: "Delivered" },
+                ].map((f) => {
+                  const count =
+                    f.key === "all"
+                      ? ordersList.length
+                      : ordersList.filter((o) => o.status === f.key).length;
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setOrderFilter(f.key)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+                        orderFilter === f.key
+                          ? "bg-gold-gradient text-black font-bold shadow-sm"
+                          : "bg-[var(--card-bg)] text-[var(--text-sub)] border border-[var(--card-border)] hover:border-[#d4af37]"
+                      }`}
+                    >
+                      {f.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
 
-                    <div className="flex items-center gap-4">
-                      <span className="font-serif font-bold text-gold-gradient text-lg">
-                        {formatCurrency(ord.total)}
-                      </span>
-                      <Link
-                        href={`/track-order?orderId=${ord.orderNumber}`}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-sm"
-                      >
-                        Track Live
-                      </Link>
+              {/* Filtered Orders List */}
+              <div className="space-y-3">
+                {ordersList
+                  .filter((o) => orderFilter === "all" || o.status === orderFilter)
+                  .map((ord) => (
+                    <div
+                      key={ord.id}
+                      className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm hover:border-[#d4af37]/40 transition-all"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-base text-[var(--text-main)]">
+                            #{ord.orderNumber.replace(/^ORD-/, "")}
+                          </span>
+                          <span className="text-xs text-[var(--text-sub)]">&bull; {ord.time}</span>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                              ord.status === "pending"
+                                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                : ord.status === "accepted"
+                                ? "bg-amber-400/15 text-amber-300 border-amber-400/30"
+                                : ord.status === "preparing"
+                                ? "bg-[#d4af37]/20 text-[#d4af37] border-[#d4af37]/40"
+                                : ord.status === "ready"
+                                ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                                : ord.status === "out_for_delivery"
+                                ? "bg-purple-500/15 text-purple-400 border-purple-500/30"
+                                : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            }`}
+                          >
+                            {ord.status.replace(/_/g, " ")}
+                          </span>
+                        </div>
+
+                        <p className="text-xs font-semibold text-[var(--text-main)]">
+                          {ord.items.join(" &bull; ")}
+                        </p>
+                        <p className="text-xs text-[var(--text-sub)]">
+                          Customer: {ord.customerName} ({ord.phone}) &bull; {ord.paymentMethod}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-sub-light)] flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-[#d4af37] shrink-0" />
+                          <span>{ord.address}</span>
+                        </p>
+                      </div>
+
+                      {/* Right Lifecycle Advancement Controls */}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <span className="font-serif font-bold text-gold-gradient text-lg block">
+                            {formatCurrency(ord.total)}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-sub)] uppercase">
+                            {ord.paymentStatus}
+                          </span>
+                        </div>
+
+                        {/* Interactive Transition Buttons */}
+                        {ord.status === "pending" && (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOrderStatus(ord.id, "accepted")}
+                              className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-sm"
+                            >
+                              ACCEPT
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOrderStatus(ord.id, "cancelled")}
+                              className="px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20"
+                            >
+                              REJECT
+                            </button>
+                          </div>
+                        )}
+
+                        {ord.status === "accepted" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(ord.id, "preparing")}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-sm flex items-center gap-1.5"
+                          >
+                            <ChefHat className="w-3.5 h-3.5" />
+                            <span>PREPARING</span>
+                          </button>
+                        )}
+
+                        {ord.status === "preparing" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(ord.id, "ready")}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-blue-500 text-white hover:bg-blue-600 shadow-sm flex items-center gap-1.5"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>READY</span>
+                          </button>
+                        )}
+
+                        {ord.status === "ready" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(ord.id, "out_for_delivery")}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-purple-500 text-white hover:bg-purple-600 shadow-sm flex items-center gap-1.5"
+                          >
+                            <Bike className="w-3.5 h-3.5" />
+                            <span>OUT FOR DELIVERY</span>
+                          </button>
+                        )}
+
+                        {ord.status === "out_for_delivery" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(ord.id, "delivered")}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-500 text-black hover:bg-emerald-400 shadow-sm flex items-center gap-1.5"
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>DELIVERED</span>
+                          </button>
+                        )}
+
+                        {ord.status === "delivered" && (
+                          <span className="text-xs font-bold text-emerald-400 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Completed</span>
+                          </span>
+                        )}
+
+                        <Link
+                          href={`/track-order?orderId=${ord.orderNumber}`}
+                          className="px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-sub)] hover:text-[#d4af37] bg-[var(--section-alt)] border border-[var(--card-border)]"
+                          title="View customer tracking"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
