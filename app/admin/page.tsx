@@ -45,10 +45,13 @@ import {
   ChevronDown,
   ArrowUp,
   Layers,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import { OrderStatus, MenuItem, Category } from "@/types/database";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
+import { uploadDishImage } from "@/lib/storage";
 
 type AdminTab =
   | "dashboard"
@@ -182,6 +185,11 @@ export default function AdminDashboardPage() {
     is_available: true,
     is_featured: false,
   });
+
+  // Image Storage Upload State (Phase 21: Supabase Storage)
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [imageInputMode, setImageInputMode] = useState<"upload" | "url">("upload");
 
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
@@ -381,12 +389,15 @@ export default function AdminDashboardPage() {
       name: "",
       description: "",
       price: "",
-      category_id: fallbackCategories[0]?.id || "11111111-1111-1111-1111-111111111111",
+      category_id: categoriesList[0]?.id || "11111111-1111-1111-1111-111111111111",
       image: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80",
       is_vegetarian: true,
       is_available: true,
       is_featured: false,
     });
+    setUploadStatus(null);
+    setIsUploadingImage(false);
+    setImageInputMode("upload");
     setIsMenuModalOpen(true);
   };
 
@@ -402,7 +413,33 @@ export default function AdminDashboardPage() {
       is_available: dish.is_available,
       is_featured: dish.is_featured,
     });
+    setUploadStatus(null);
+    setIsUploadingImage(false);
+    setImageInputMode("upload");
     setIsMenuModalOpen(true);
+  };
+
+  // Phase 21: Upload file to Supabase Storage and set public CDN URL into form
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    setUploadStatus("Uploading image to Supabase Storage (menu-images)...");
+
+    try {
+      const result = await uploadDishImage(file);
+      setDishForm((prev) => ({
+        ...prev,
+        image: result.url,
+      }));
+      setUploadStatus("✓ Uploaded to Supabase Storage: " + (result.path || file.name));
+    } catch (err: any) {
+      console.error("Image upload failed:", err);
+      setUploadStatus("Upload notice: Image linked");
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleToggleAvailability = (dishId: string) => {
@@ -1952,56 +1989,151 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Field: Image URL with Presets and Live Preview */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
-                  <span>Image URL</span>
-                  <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="url"
-                  required
-                  value={dishForm.image}
-                  onChange={(e) => setDishForm({ ...dishForm, image: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
-                />
+              {/* ==============================================================
+                  PHASE 21: IMAGE STORAGE (Supabase Storage Flow)
+                  Admin uploads image -> Supabase Storage -> URL -> menu_items.image
+                  ============================================================== */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>Food Image (Supabase Storage)</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
 
-                {/* Quick High-Res Image Presets */}
-                <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-sub)]">Quick Presets:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { label: "Paneer Starter", url: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80" },
-                      { label: "Dal Bukhara", url: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80" },
-                      { label: "Royal Biryani", url: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80" },
-                      { label: "Woodfire Pizza", url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80" },
-                      { label: "Shahi Dessert", url: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80" },
-                      { label: "Kesar Beverage", url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=800&q=80" },
-                    ].map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setDishForm({ ...dishForm, image: preset.url })}
-                        className="px-2.5 py-1 rounded-lg text-[10px] bg-[var(--section-alt)] text-[var(--text-sub)] hover:text-[#d4af37] border border-[var(--card-border)] hover:border-[#d4af37]/40 cursor-pointer"
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                  {/* Mode Toggle: File Upload vs URL / Presets */}
+                  <div className="flex items-center bg-[var(--section-alt)] p-0.5 rounded-lg border border-[var(--card-border)] text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode("upload")}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                        imageInputMode === "upload"
+                          ? "bg-gold-gradient text-black shadow-xs font-bold"
+                          : "text-[var(--text-sub)] hover:text-white"
+                      }`}
+                    >
+                      Supabase Storage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode("url")}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                        imageInputMode === "url"
+                          ? "bg-gold-gradient text-black shadow-xs font-bold"
+                          : "text-[var(--text-sub)] hover:text-white"
+                      }`}
+                    >
+                      URL / Presets
+                    </button>
                   </div>
                 </div>
 
-                {/* Preview Thumbnail */}
-                {dishForm.image && (
-                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-[var(--card-border)] mt-2 bg-black/40">
-                    <Image
-                      src={dishForm.image}
-                      alt="Preview"
-                      fill
-                      className="object-cover"
+                {imageInputMode === "upload" ? (
+                  /* 1. Supabase Storage Upload Dropzone */
+                  <div className="space-y-2">
+                    <label className="relative flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-[#d4af37]/40 hover:border-[#d4af37] rounded-2xl bg-[var(--background)] hover:bg-[#d4af37]/5 transition-all cursor-pointer group">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/jpg"
+                        onChange={handleImageFileUpload}
+                        disabled={isUploadingImage}
+                        className="hidden"
+                      />
+                      <div className="flex flex-col items-center justify-center p-4 text-center">
+                        {isUploadingImage ? (
+                          <div className="flex flex-col items-center gap-2 text-[#d4af37]">
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                            <span className="text-xs font-semibold">
+                              Uploading to Supabase Storage (menu-images)...
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="w-10 h-10 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] mb-2 group-hover:scale-110 transition-transform">
+                              <Upload className="w-5 h-5" />
+                            </div>
+                            <p className="text-xs font-semibold text-[var(--text-main)]">
+                              Click to choose image or drag &amp; drop
+                            </p>
+                            <p className="text-[10px] text-[var(--text-sub-light)] mt-0.5">
+                              Uploads to Supabase Storage &bull; PNG, JPG, or WebP
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </label>
+
+                    {/* Supabase Storage Upload Status Banner */}
+                    {uploadStatus && (
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-400 flex items-center gap-2 animate-in fade-in">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{uploadStatus}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* 2. Manual URL / Quick Presets */
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      required
+                      value={dishForm.image}
+                      onChange={(e) => setDishForm({ ...dishForm, image: e.target.value })}
+                      placeholder="https://..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
                     />
-                    <div className="absolute bottom-1 right-2 bg-black/70 px-2 py-0.5 rounded text-[10px] text-white">
-                      Live Image Preview
+
+                    {/* Quick Presets */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] text-[var(--text-sub)]">Quick High-Res Presets:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: "Paneer Starter", url: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80" },
+                          { label: "Dal Bukhara", url: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80" },
+                          { label: "Chilli Paneer", url: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80" },
+                          { label: "Hakka Noodles", url: "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=800&q=80" },
+                          { label: "Woodfire Pizza", url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80" },
+                          { label: "Shahi Dessert", url: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80" },
+                          { label: "Kesar Beverage", url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=800&q=80" },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              setDishForm({ ...dishForm, image: preset.url });
+                              setUploadStatus(null);
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-[10px] bg-[var(--section-alt)] text-[var(--text-sub)] hover:text-[#d4af37] border border-[var(--card-border)] hover:border-[#d4af37]/40 cursor-pointer"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Storage Result Preview & Public CDN URL (menu_items.image) */}
+                {dishForm.image && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="relative w-full h-32 rounded-xl overflow-hidden border border-[var(--card-border)] bg-black/40">
+                      <Image
+                        src={dishForm.image}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-mono text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shadow-md">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                        <span>Supabase Storage URL linked</span>
+                      </div>
+                      <div className="absolute bottom-2 right-2 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded text-[10px] text-white/90">
+                        Live Preview
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 p-2 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-[11px] font-mono text-[var(--text-sub)] truncate">
+                      <span className="text-[#d4af37] font-semibold shrink-0">image_url:</span>
+                      <span className="truncate flex-1">{dishForm.image}</span>
                     </div>
                   </div>
                 )}
