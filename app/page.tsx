@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
-  Sparkles,
   Utensils,
   ShieldCheck,
   Flame,
@@ -166,21 +165,15 @@ export default function Home() {
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#d4af37]/10 rounded-full blur-[140px] pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto text-center space-y-8 py-20">
-          {/* Welcome Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/40 text-[#d4af37] text-xs uppercase tracking-[0.3em] font-medium gold-glow-sm shadow-sm">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Welcome to NEXORA Luxury Dining</span>
-          </div>
-
           {/* Heading */}
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif font-bold tracking-tight text-[var(--text-main)] leading-[1.15]">
-            Where Every Flavour Tells A{" "}
-            <span className="text-gold-gradient block mt-2">Royal Story</span>
+            A Taste of Something{" "}
+            <span className="text-gold-gradient block mt-2">Extraordinary</span>
           </h1>
 
           {/* Subtitle */}
           <p className="max-w-2xl mx-auto text-base sm:text-lg text-[var(--text-sub)] leading-relaxed font-light">
-            Authentic food. Handcrafted with Michelin-calibre care, organic farm-sourced heritage spices, and served with royal perfection.
+            Discover exquisite flavours, crafted with passion.
           </p>
 
           {/* Dual CTAs */}
