@@ -165,11 +165,17 @@ export default function Home() {
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#d4af37]/10 rounded-full blur-[140px] pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto text-center space-y-8 py-20">
-          {/* Heading */}
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif font-bold tracking-tight text-[var(--text-main)] leading-[1.15]">
-            A Taste of Something{" "}
-            <span className="text-gold-gradient block mt-2">Extraordinary</span>
-          </h1>
+          <div className="space-y-4">
+            <p className="text-xs sm:text-sm uppercase tracking-[0.35em] text-[#d4af37] font-semibold">
+              WELCOME TO NEXORA
+            </p>
+
+            {/* Heading */}
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif font-bold tracking-tight text-[var(--text-main)] leading-[1.15]">
+              A Taste of Something{" "}
+              <span className="text-gold-gradient block mt-2">Extraordinary</span>
+            </h1>
+          </div>
 
           {/* Subtitle */}
           <p className="max-w-2xl mx-auto text-base sm:text-lg text-[var(--text-sub)] leading-relaxed font-light">
