@@ -41,9 +41,13 @@ import {
   EyeOff,
   Sparkles,
   Filter,
+  ChevronUp,
+  ChevronDown,
+  ArrowUp,
+  Layers,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
-import { OrderStatus, MenuItem } from "@/types/database";
+import { OrderStatus, MenuItem, Category } from "@/types/database";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
 
 type AdminTab =
@@ -145,13 +149,27 @@ export default function AdminDashboardPage() {
   ]);
 
   // ==========================================================
-  // PHASE 19: ADMIN MENU MANAGEMENT STATE & PERSISTENCE
+  // PHASE 19 & 20: ADMIN MENU & CATEGORY MANAGEMENT STATE & PERSISTENCE
   // ==========================================================
   const [menuItems, setMenuItems] = useState<MenuItem[]>(fallbackMenuItems);
   const [menuSearch, setMenuSearch] = useState<string>("" );
   const [menuFilterCategory, setMenuFilterCategory] = useState<string>("all");
   const [isMenuModalOpen, setIsMenuModalOpen] = useState<boolean>(false);
   const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
+
+  // Category Management State (Phase 20)
+  const [categoriesList, setCategoriesList] = useState<Category[]>(fallbackCategories);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  // Category Form State (Add / Edit)
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    slug: "",
+    description: "",
+    display_order: 1,
+    is_active: true,
+  });
 
   // Modal Form State (Matching Phase 19 fields: Name, Description, Price, Category, Image, Vegetarian, Available, Featured)
   const [dishForm, setDishForm] = useState({
@@ -165,7 +183,7 @@ export default function AdminDashboardPage() {
     is_featured: false,
   });
 
-  // Auth Verification & Menu Initialization from localStorage
+  // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("nexora_admin_user");
@@ -197,8 +215,156 @@ export default function AdminDashboardPage() {
       } catch (err) {
         console.warn("Error syncing admin menu from storage:", err);
       }
+
+      // Load / Sync Admin Categories from localStorage (Phase 20)
+      try {
+        const storedCats = localStorage.getItem("nexora_admin_categories");
+        if (storedCats) {
+          const parsedCats = JSON.parse(storedCats);
+          if (Array.isArray(parsedCats) && parsedCats.length > 0) {
+            setCategoriesList(
+              parsedCats.sort((a: Category, b: Category) => a.display_order - b.display_order)
+            );
+          } else {
+            localStorage.setItem("nexora_admin_categories", JSON.stringify(fallbackCategories));
+          }
+        } else {
+          localStorage.setItem("nexora_admin_categories", JSON.stringify(fallbackCategories));
+        }
+      } catch (err) {
+        console.warn("Error syncing admin categories from storage:", err);
+      }
     }
   }, [router]);
+
+  // ==========================================================
+  // PHASE 20: CATEGORY MANAGEMENT HANDLERS (Add, Edit, Delete, Reorder, Enable/Disable)
+  // ==========================================================
+  const saveCategoriesToStorage = (updated: Category[]) => {
+    const sorted = [...updated].sort((a, b) => a.display_order - b.display_order);
+    setCategoriesList(sorted);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_admin_categories", JSON.stringify(sorted));
+      window.dispatchEvent(new Event("nexora_categories_updated"));
+    }
+  };
+
+  const handleOpenAddCategoryModal = () => {
+    setEditingCategory(null);
+    setCategoryForm({
+      name: "",
+      slug: "",
+      description: "",
+      display_order: categoriesList.length + 1,
+      is_active: true,
+    });
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleOpenEditCategoryModal = (cat: Category) => {
+    setEditingCategory(cat);
+    setCategoryForm({
+      name: cat.name,
+      slug: cat.slug || "",
+      description: cat.description || "",
+      display_order: cat.display_order,
+      is_active: cat.is_active,
+    });
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleToggleCategoryActive = (catId: string) => {
+    const updated = categoriesList.map((c) =>
+      c.id === catId ? { ...c, is_active: !c.is_active } : c
+    );
+    saveCategoriesToStorage(updated);
+  };
+
+  const handleReorderCategory = (catId: string, direction: "up" | "down") => {
+    const sorted = [...categoriesList].sort((a, b) => a.display_order - b.display_order);
+    const index = sorted.findIndex((c) => c.id === catId);
+    if (index === -1) return;
+
+    if (direction === "up" && index > 0) {
+      const prev = sorted[index - 1];
+      const curr = sorted[index];
+      const tempOrder = prev.display_order;
+      prev.display_order = curr.display_order;
+      curr.display_order = tempOrder;
+      if (prev.display_order === curr.display_order) {
+        curr.display_order = index;
+        prev.display_order = index + 1;
+      }
+      saveCategoriesToStorage(sorted);
+    } else if (direction === "down" && index < sorted.length - 1) {
+      const next = sorted[index + 1];
+      const curr = sorted[index];
+      const tempOrder = next.display_order;
+      next.display_order = curr.display_order;
+      curr.display_order = tempOrder;
+      if (next.display_order === curr.display_order) {
+        curr.display_order = index + 2;
+        next.display_order = index + 1;
+      }
+      saveCategoriesToStorage(sorted);
+    }
+  };
+
+  const handleSaveCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) return;
+
+    const cleanName = categoryForm.name.trim();
+    const cleanSlug = (categoryForm.slug.trim() || cleanName)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    let updated: Category[];
+    if (editingCategory) {
+      updated = categoriesList.map((c) =>
+        c.id === editingCategory.id
+          ? {
+              ...c,
+              name: cleanName,
+              slug: cleanSlug,
+              description: categoryForm.description.trim(),
+              display_order: Number(categoryForm.display_order) || c.display_order,
+              is_active: categoryForm.is_active,
+            }
+          : c
+      );
+    } else {
+      const newCat: Category = {
+        id: `cat-${Date.now()}`,
+        name: cleanName,
+        slug: cleanSlug,
+        description: categoryForm.description.trim(),
+        display_order: Number(categoryForm.display_order) || categoriesList.length + 1,
+        is_active: categoryForm.is_active,
+        created_at: new Date().toISOString(),
+      };
+      updated = [...categoriesList, newCat];
+    }
+
+    saveCategoriesToStorage(updated);
+    setIsCategoryModalOpen(false);
+    setEditingCategory(null);
+  };
+
+  const handleDeleteCategory = (catId: string, catName: string) => {
+    const dishCount = menuItems.filter((m) => m.category_id === catId).length;
+    let confirmMsg = `Remove category "${catName}"?`;
+    if (dishCount > 0) {
+      confirmMsg = `Warning: "${catName}" contains ${dishCount} dish(es). Deleting this category will remove it from the menu. Do you wish to continue?`;
+    }
+
+    if (confirm(confirmMsg)) {
+      const remaining = categoriesList.filter((c) => c.id !== catId);
+      const reindexed = remaining.map((c, i) => ({ ...c, display_order: i + 1 }));
+      saveCategoriesToStorage(reindexed);
+    }
+  };
 
   // Save Menu Changes to State & localStorage (Dispatches custom event for live customer sync)
   const saveMenuToStorage = (updatedList: MenuItem[]) => {
@@ -1048,7 +1214,7 @@ export default function AdminDashboardPage() {
                   >
                     All ({menuItems.length})
                   </button>
-                  {fallbackCategories.map((c) => {
+                  {categoriesList.map((c) => {
                     const count = menuItems.filter((i) => i.category_id === c.id).length;
                     return (
                       <button
@@ -1086,7 +1252,7 @@ export default function AdminDashboardPage() {
                   })
                   .map((dish) => {
                     const categoryName =
-                      fallbackCategories.find((c) => c.id === dish.category_id)?.name ||
+                      categoriesList.find((c) => c.id === dish.category_id)?.name ||
                       "Signature Dish";
                     const isAvailable = dish.is_available;
 
@@ -1234,41 +1400,186 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ==========================================================
-              TAB: CATEGORIES
+              TAB: CATEGORIES (PHASE 20: CATEGORY MANAGEMENT)
               ========================================================== */}
           {activeTab === "categories" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="pb-4 border-b border-[var(--card-border)]">
-                <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                  Categories
-                </h2>
-                <p className="text-xs text-[var(--text-sub)]">
-                  Organize culinary courses and menu groups.
-                </p>
+              {/* Header Bar matching prompt: Categories + Add */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-2xl font-serif font-bold text-[var(--text-main)] tracking-wide">
+                    CATEGORY MANAGEMENT
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Curate courses (Starters, Main Course, Chinese, Pizza, Desserts, Drinks), reorder, edit, and toggle visibility.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenAddCategoryModal}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>+ Add Category</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {[
-                  "Royal Starters & Tandoor",
-                  "Chef's Signature Mains",
-                  "Wood-Fired Artisan Pizza",
-                  "Heritage Breads & Rice",
-                  "Royal Desserts & Mithai",
-                  "Artisan Beverages & Mocktails",
-                ].map((cat, i) => (
-                  <div
-                    key={i}
-                    className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-1"
-                  >
-                    <FolderTree className="w-5 h-5 text-[#d4af37]" />
-                    <h4 className="text-sm font-semibold text-[var(--text-main)] pt-2">
-                      {cat}
-                    </h4>
-                    <span className="text-[11px] text-[var(--text-sub)]">
-                      Active category &bull; 100% Pure Veg
-                    </span>
-                  </div>
-                ))}
+              {/* Quick Summary KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Total Categories</span>
+                  <span className="text-xl font-serif font-bold text-[var(--text-main)]">{categoriesList.length}</span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Active Courses</span>
+                  <span className="text-xl font-serif font-bold text-emerald-400">
+                    {categoriesList.filter((c) => c.is_active).length}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Disabled</span>
+                  <span className="text-xl font-serif font-bold text-rose-400">
+                    {categoriesList.filter((c) => !c.is_active).length}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Mapped Dishes</span>
+                  <span className="text-xl font-serif font-bold text-[#d4af37]">{menuItems.length}</span>
+                </div>
+              </div>
+
+              {/* Category Cards List (Sorted by display_order) */}
+              <div className="space-y-3">
+                {categoriesList
+                  .slice()
+                  .sort((a, b) => a.display_order - b.display_order)
+                  .map((cat, idx, arr) => {
+                    const dishCount = menuItems.filter((i) => i.category_id === cat.id).length;
+                    const isFirst = idx === 0;
+                    const isLast = idx === arr.length - 1;
+
+                    return (
+                      <div
+                        key={cat.id}
+                        className={`p-5 rounded-2xl bg-[var(--card-bg)] border transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:border-[#d4af37]/60 ${
+                          cat.is_active
+                            ? "border-[var(--card-border)]"
+                            : "border-rose-500/25 opacity-75 bg-rose-950/5"
+                        }`}
+                      >
+                        {/* Left: Reorder Controls, Sequence & Details */}
+                        <div className="flex items-start sm:items-center gap-4">
+                          {/* Reorder Buttons (Up / Down) */}
+                          <div className="flex sm:flex-col items-center gap-1 shrink-0 bg-[var(--section-alt)] p-1 rounded-xl border border-[var(--card-border)]">
+                            <button
+                              type="button"
+                              onClick={() => handleReorderCategory(cat.id, "up")}
+                              disabled={isFirst}
+                              title="Move Up"
+                              className="p-1 rounded-lg text-[var(--text-sub)] hover:text-[#d4af37] hover:bg-[#d4af37]/15 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-[var(--text-sub)] cursor-pointer disabled:cursor-not-allowed transition-colors"
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <span className="font-mono font-bold text-xs text-[#d4af37] px-1 min-w-[20px] text-center">
+                              #{cat.display_order}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleReorderCategory(cat.id, "down")}
+                              disabled={isLast}
+                              title="Move Down"
+                              className="p-1 rounded-lg text-[var(--text-sub)] hover:text-[#d4af37] hover:bg-[#d4af37]/15 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-[var(--text-sub)] cursor-pointer disabled:cursor-not-allowed transition-colors"
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Category Details */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <h3 className="font-serif font-bold text-lg text-[var(--text-main)]">
+                                {cat.name}
+                              </h3>
+                              <span className="font-mono text-[11px] text-[var(--text-sub-light)] bg-[var(--section-alt)] px-2 py-0.5 rounded border border-[var(--card-border)]">
+                                slug: /{cat.slug || cat.id}
+                              </span>
+                              <span className="text-[11px] font-semibold text-[#d4af37] bg-[#d4af37]/10 px-2.5 py-0.5 rounded-full border border-[#d4af37]/30">
+                                {dishCount} {dishCount === 1 ? "dish" : "dishes"}
+                              </span>
+                            </div>
+
+                            {cat.description && (
+                              <p className="text-xs text-[var(--text-sub)] font-light leading-relaxed max-w-2xl">
+                                {cat.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Status Badge & Actions (Edit, Enable/Disable, Delete) */}
+                        <div className="flex items-center justify-between md:justify-end gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--card-border)]">
+                          {/* Status Badge */}
+                          {cat.is_active ? (
+                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>Enabled ✓</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/30">
+                              <X className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>Disabled</span>
+                            </span>
+                          )}
+
+                          {/* Action Buttons: [Edit] [Disable/Enable] [Delete] */}
+                          <div className="flex items-center gap-2">
+                            {/* [Edit] */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCategoryModal(cat)}
+                              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-main)] bg-[var(--section-alt)] hover:bg-[#d4af37]/15 hover:text-[#d4af37] border border-[var(--card-border)] hover:border-[#d4af37]/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+
+                            {/* [Enable / Disable] */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCategoryActive(cat.id)}
+                              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                cat.is_active
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20"
+                                  : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
+                              }`}
+                            >
+                              {cat.is_active ? (
+                                <>
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                  <span>Disable</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Enable</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* [Delete] */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                              className="p-2 rounded-xl text-[var(--text-sub-light)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              title="Delete category"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -1632,7 +1943,7 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setDishForm({ ...dishForm, category_id: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
                   >
-                    {fallbackCategories.map((c) => (
+                    {categoriesList.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -1764,6 +2075,144 @@ export default function AdminDashboardPage() {
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
                   <span>[ SAVE ]</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==============================================================
+          PHASE 20 MODAL: ADD / EDIT CATEGORY
+          ============================================================== */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-2xl p-6 sm:p-8 space-y-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
+              <div>
+                <h3 className="text-xl font-serif font-bold text-[var(--text-main)]">
+                  {editingCategory ? `Edit Category: ${editingCategory.name}` : "Add New Category"}
+                </h3>
+                <p className="text-xs text-[var(--text-sub)]">
+                  Category changes update live on customer menu and order filters.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="p-2 rounded-xl text-[var(--text-sub)] hover:text-white hover:bg-[var(--section-alt)] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveCategory} className="space-y-4">
+              {/* Category Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                  <span>Category Name</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={categoryForm.name}
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    const autoSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    setCategoryForm({
+                      ...categoryForm,
+                      name: newName,
+                      slug: editingCategory ? categoryForm.slug : autoSlug,
+                    });
+                  }}
+                  placeholder="e.g. Chinese"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              {/* Slug & Display Order */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>Slug (URL Key)</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={categoryForm.slug}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                    placeholder="e.g. chinese"
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm font-mono text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>Display Sequence</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={categoryForm.display_order}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, display_order: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                  <span>Description</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={categoryForm.description}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  placeholder="Gourmet course introduction, preparation highlights..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37] resize-none"
+                />
+              </div>
+
+              {/* Status: Active */}
+              <div className="p-4 rounded-2xl bg-[var(--background)] border border-[var(--card-border)]">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs font-semibold text-[var(--text-main)]">
+                      Enabled (Visible to guests on menu)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.is_active}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, is_active: e.target.checked })}
+                    className="w-4 h-4 accent-[#d4af37] cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {/* Buttons */}
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="w-1/3 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] bg-[var(--section-alt)] hover:text-white border border-[var(--card-border)] transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-mono"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>[ SAVE CATEGORY ]</span>
                 </button>
               </div>
             </form>

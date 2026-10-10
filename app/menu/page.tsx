@@ -5,7 +5,7 @@ import Link from "next/link";
 import FoodCard from "@/components/FoodCard";
 import { useCart } from "@/context/CartContext";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
-import { MenuItem } from "@/types/database";
+import { MenuItem, Category } from "@/types/database";
 import {
   Search,
   Sparkles,
@@ -21,32 +21,49 @@ import { formatCurrency } from "@/utils/formatters";
 export default function MenuPage() {
   const { addToCart, updateQuantity, getItemQuantity, totalItems, subtotal } = useCart();
   
-  // Dynamic menu items loaded from admin storage / fallback
+  // Dynamic menu items & categories loaded from admin storage / fallback
   const [menuItems, setMenuItems] = useState<MenuItem[]>(fallbackMenuItems);
+  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
 
   useEffect(() => {
-    const loadDynamicMenu = () => {
+    const loadDynamicData = () => {
       if (typeof window !== "undefined") {
         try {
-          const stored = localStorage.getItem("nexora_admin_menu");
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setMenuItems(parsed);
+          const storedMenu = localStorage.getItem("nexora_admin_menu");
+          if (storedMenu) {
+            const parsedMenu = JSON.parse(storedMenu);
+            if (Array.isArray(parsedMenu) && parsedMenu.length > 0) {
+              setMenuItems(parsedMenu);
             }
           }
         } catch (e) {
           console.error("Failed to load admin menu", e);
         }
+
+        try {
+          const storedCats = localStorage.getItem("nexora_admin_categories");
+          if (storedCats) {
+            const parsedCats = JSON.parse(storedCats);
+            if (Array.isArray(parsedCats) && parsedCats.length > 0) {
+              setCategories(
+                parsedCats.sort((a: Category, b: Category) => a.display_order - b.display_order)
+              );
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load admin categories", e);
+        }
       }
     };
 
-    loadDynamicMenu();
-    window.addEventListener("storage", loadDynamicMenu);
-    window.addEventListener("nexora_menu_updated", loadDynamicMenu);
+    loadDynamicData();
+    window.addEventListener("storage", loadDynamicData);
+    window.addEventListener("nexora_menu_updated", loadDynamicData);
+    window.addEventListener("nexora_categories_updated", loadDynamicData);
     return () => {
-      window.removeEventListener("storage", loadDynamicMenu);
-      window.removeEventListener("nexora_menu_updated", loadDynamicMenu);
+      window.removeEventListener("storage", loadDynamicData);
+      window.removeEventListener("nexora_menu_updated", loadDynamicData);
+      window.removeEventListener("nexora_categories_updated", loadDynamicData);
     };
   }, []);
 
@@ -83,7 +100,7 @@ export default function MenuPage() {
     return menuItems.filter((item) => {
       // 1. Category filter
       if (selectedCategory !== "all") {
-        const category = fallbackCategories.find((c) => c.slug === selectedCategory);
+        const category = categories.find((c) => c.slug === selectedCategory || c.id === selectedCategory);
         if (category && item.category_id !== category.id) {
           return false;
         }
@@ -105,16 +122,19 @@ export default function MenuPage() {
 
       return true;
     });
-  }, [menuItems, selectedCategory, dietFilter, searchQuery]);
+  }, [menuItems, categories, selectedCategory, dietFilter, searchQuery]);
 
-  // Categories list with [All] at the start
+  // Categories list with [All] at the start, sorted by display_order, only active categories
   const categoryFilters = [
     { slug: "all", name: "All", count: menuItems.length },
-    ...fallbackCategories.map((c) => ({
-      slug: c.slug || c.id,
-      name: c.name.replace("Royal ", "").replace("Woodfire ", "").replace(" & Elixirs", ""),
-      count: menuItems.filter((item) => item.category_id === c.id).length,
-    })),
+    ...categories
+      .filter((c) => c.is_active !== false)
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((c) => ({
+        slug: c.slug || c.id,
+        name: c.name.replace("Royal ", "").replace("Woodfire ", "").replace(" & Elixirs", ""),
+        count: menuItems.filter((item) => item.category_id === c.id).length,
+      })),
   ];
 
   return (
