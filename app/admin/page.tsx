@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -34,9 +35,16 @@ import {
   Check,
   X,
   ArrowDown,
+  Edit2,
+  Trash2,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Filter,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
-import { OrderStatus } from "@/types/database";
+import { OrderStatus, MenuItem } from "@/types/database";
+import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
 
 type AdminTab =
   | "dashboard"
@@ -136,7 +144,28 @@ export default function AdminDashboardPage() {
     },
   ]);
 
-  // Auth Verification
+  // ==========================================================
+  // PHASE 19: ADMIN MENU MANAGEMENT STATE & PERSISTENCE
+  // ==========================================================
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(fallbackMenuItems);
+  const [menuSearch, setMenuSearch] = useState<string>("" );
+  const [menuFilterCategory, setMenuFilterCategory] = useState<string>("all");
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState<boolean>(false);
+  const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
+
+  // Modal Form State (Matching Phase 19 fields: Name, Description, Price, Category, Image, Vegetarian, Available, Featured)
+  const [dishForm, setDishForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category_id: fallbackCategories[0]?.id || "11111111-1111-1111-1111-111111111111",
+    image: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80",
+    is_vegetarian: true,
+    is_available: true,
+    is_featured: false,
+  });
+
+  // Auth Verification & Menu Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("nexora_admin_user");
@@ -145,14 +174,142 @@ export default function AdminDashboardPage() {
           const parsed = JSON.parse(stored);
           setAdminUser(parsed);
           setIsLoading(false);
-          return;
         } catch {}
+      } else {
+        // Not authenticated -> redirect to /admin/login
+        router.push("/admin/login");
+        return;
       }
 
-      // Not authenticated -> redirect to /admin/login
-      router.push("/admin/login");
+      // Load / Sync Admin Menu from localStorage
+      try {
+        const storedMenu = localStorage.getItem("nexora_admin_menu");
+        if (storedMenu) {
+          const parsedMenu = JSON.parse(storedMenu);
+          if (Array.isArray(parsedMenu) && parsedMenu.length > 0) {
+            setMenuItems(parsedMenu);
+          } else {
+            localStorage.setItem("nexora_admin_menu", JSON.stringify(fallbackMenuItems));
+          }
+        } else {
+          localStorage.setItem("nexora_admin_menu", JSON.stringify(fallbackMenuItems));
+        }
+      } catch (err) {
+        console.warn("Error syncing admin menu from storage:", err);
+      }
     }
   }, [router]);
+
+  // Save Menu Changes to State & localStorage (Dispatches custom event for live customer sync)
+  const saveMenuToStorage = (updatedList: MenuItem[]) => {
+    setMenuItems(updatedList);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_admin_menu", JSON.stringify(updatedList));
+      window.dispatchEvent(new Event("nexora_menu_updated"));
+    }
+  };
+
+  const handleOpenAddModal = () => {
+    setEditingDish(null);
+    setDishForm({
+      name: "",
+      description: "",
+      price: "",
+      category_id: fallbackCategories[0]?.id || "11111111-1111-1111-1111-111111111111",
+      image: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80",
+      is_vegetarian: true,
+      is_available: true,
+      is_featured: false,
+    });
+    setIsMenuModalOpen(true);
+  };
+
+  const handleOpenEditModal = (dish: MenuItem) => {
+    setEditingDish(dish);
+    setDishForm({
+      name: dish.name,
+      description: dish.description,
+      price: dish.price.toString(),
+      category_id: dish.category_id,
+      image: dish.image || dish.image_url,
+      is_vegetarian: dish.is_vegetarian ?? dish.is_veg ?? true,
+      is_available: dish.is_available,
+      is_featured: dish.is_featured,
+    });
+    setIsMenuModalOpen(true);
+  };
+
+  const handleToggleAvailability = (dishId: string) => {
+    const updated = menuItems.map((item) =>
+      item.id === dishId ? { ...item, is_available: !item.is_available } : item
+    );
+    saveMenuToStorage(updated);
+  };
+
+  const handleSaveDish = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dishForm.name.trim()) return;
+    const priceNum = parseFloat(dishForm.price) || 0;
+
+    let updated: MenuItem[];
+    if (editingDish) {
+      updated = menuItems.map((item) =>
+        item.id === editingDish.id
+          ? {
+              ...item,
+              name: dishForm.name.trim(),
+              description: dishForm.description.trim(),
+              price: priceNum,
+              category_id: dishForm.category_id,
+              image: dishForm.image.trim(),
+              image_url: dishForm.image.trim(),
+              is_vegetarian: dishForm.is_vegetarian,
+              is_veg: dishForm.is_vegetarian,
+              is_available: dishForm.is_available,
+              is_featured: dishForm.is_featured,
+              updated_at: new Date().toISOString(),
+            }
+          : item
+      );
+    } else {
+      const newId = `item-${Date.now()}`;
+      const newSlug = dishForm.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const newDish: MenuItem = {
+        id: newId,
+        slug: newSlug,
+        name: dishForm.name.trim(),
+        description: dishForm.description.trim(),
+        price: priceNum,
+        category_id: dishForm.category_id,
+        image: dishForm.image.trim(),
+        image_url: dishForm.image.trim(),
+        is_vegetarian: dishForm.is_vegetarian,
+        is_veg: dishForm.is_vegetarian,
+        is_available: dishForm.is_available,
+        is_featured: dishForm.is_featured,
+        spice_level: "medium",
+        prep_time_minutes: 20,
+        calories: 350,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      updated = [newDish, ...menuItems];
+    }
+
+    saveMenuToStorage(updated);
+    setIsMenuModalOpen(false);
+    setEditingDish(null);
+  };
+
+  const handleDeleteDish = (dishId: string, dishName: string) => {
+    if (confirm(`Remove "${dishName}" from NEXORA menu?`)) {
+      const updated = menuItems.filter((item) => item.id !== dishId);
+      saveMenuToStorage(updated);
+    }
+  };
 
   const handleAdminLogout = () => {
     if (typeof window !== "undefined") {
@@ -805,54 +962,273 @@ export default function AdminDashboardPage() {
           )}
 
           {/* ==========================================================
-              TAB: MENU (100% PURE VEG MANAGEMENT)
+              TAB: MENU (PHASE 19: 100% PURE VEG GOURMET MANAGEMENT)
               ========================================================== */}
           {activeTab === "menu" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
+              {/* Header Bar matching prompt: MENU MANAGEMENT + Add Item */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
                 <div>
-                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                    Menu Management
+                  <h2 className="text-2xl font-serif font-bold text-[var(--text-main)] tracking-wide">
+                    MENU MANAGEMENT
                   </h2>
                   <p className="text-xs text-[var(--text-sub)]">
-                    Manage 100% Pure Vegetarian gourmet dishes & pricing.
+                    Owner Direct Control &bull; Live dish pricing, real-time availability & pure-veg catalogue. Owner ko code touch nahi karna pade.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert("Add Item feature enabled.")}
-                  className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-sm flex items-center gap-1.5"
+                  onClick={handleOpenAddModal}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-auto"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add New Dish</span>
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>+ Add Item</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { name: "Truffle Malai Paneer Tikka", price: 440, cat: "Starters", stock: true },
-                  { name: "NEXORA Royal Dal Bukhara", price: 470, cat: "Main Course", stock: true },
-                  { name: "Burrata & Truffle Funghi Pizza", price: 610, cat: "Wood-Fired Pizza", stock: true },
-                  { name: "24K Gold Saffron Shahi Tukda", price: 320, cat: "Desserts", stock: true },
-                ].map((dish, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between"
+              {/* Quick Summary KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Total Dishes</span>
+                  <span className="text-xl font-serif font-bold text-[var(--text-main)]">{menuItems.length}</span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Available</span>
+                  <span className="text-xl font-serif font-bold text-emerald-400">
+                    {menuItems.filter((i) => i.is_available).length}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Disabled</span>
+                  <span className="text-xl font-serif font-bold text-rose-400">
+                    {menuItems.filter((i) => !i.is_available).length}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)]">
+                  <span className="text-[11px] text-[var(--text-sub)] uppercase tracking-wider block">Featured</span>
+                  <span className="text-xl font-serif font-bold text-[#d4af37]">
+                    {menuItems.filter((i) => i.is_featured).length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Filters & Search Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-[var(--text-sub)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={menuSearch}
+                    onChange={(e) => setMenuSearch(e.target.value)}
+                    placeholder="Search dish by name or description..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-xs text-[var(--text-main)] placeholder-[var(--text-sub)] focus:outline-none focus:border-[#d4af37]"
+                  />
+                  {menuSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setMenuSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-sub)] hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter Buttons */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => setMenuFilterCategory("all")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shrink-0 ${
+                      menuFilterCategory === "all"
+                        ? "bg-gold-gradient text-black font-bold shadow-sm"
+                        : "bg-[var(--card-bg)] text-[var(--text-sub)] border border-[var(--card-border)] hover:border-[#d4af37]"
+                    }`}
                   >
-                    <div>
-                      <h4 className="text-sm font-semibold text-[var(--text-main)]">
-                        {dish.name}
-                      </h4>
-                      <p className="text-xs text-[var(--text-sub)]">
-                        {dish.cat} &bull;{" "}
-                        <span className="text-[#d4af37] font-semibold">₹{dish.price}</span>
-                      </p>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      In Stock
-                    </span>
-                  </div>
-                ))}
+                    All ({menuItems.length})
+                  </button>
+                  {fallbackCategories.map((c) => {
+                    const count = menuItems.filter((i) => i.category_id === c.id).length;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setMenuFilterCategory(c.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shrink-0 ${
+                          menuFilterCategory === c.id
+                            ? "bg-gold-gradient text-black font-bold shadow-sm"
+                            : "bg-[var(--card-bg)] text-[var(--text-sub)] border border-[var(--card-border)] hover:border-[#d4af37]"
+                        }`}
+                      >
+                        {c.name.replace("Royal ", "").replace("Woodfire ", "")} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Dish Cards Grid (Matching: Paneer Tikka / ₹249 / Available ✓ / [Edit] [Disable]) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {menuItems
+                  .filter((dish) => {
+                    if (menuFilterCategory !== "all" && dish.category_id !== menuFilterCategory) {
+                      return false;
+                    }
+                    if (menuSearch.trim()) {
+                      const q = menuSearch.toLowerCase().trim();
+                      return (
+                        dish.name.toLowerCase().includes(q) ||
+                        dish.description.toLowerCase().includes(q)
+                      );
+                    }
+                    return true;
+                  })
+                  .map((dish) => {
+                    const categoryName =
+                      fallbackCategories.find((c) => c.id === dish.category_id)?.name ||
+                      "Signature Dish";
+                    const isAvailable = dish.is_available;
+
+                    return (
+                      <div
+                        key={dish.id}
+                        className={`p-5 rounded-2xl bg-[var(--card-bg)] border transition-all duration-200 flex flex-col justify-between gap-4 shadow-sm hover:border-[#d4af37]/60 ${
+                          isAvailable
+                            ? "border-[var(--card-border)]"
+                            : "border-rose-500/25 opacity-80 bg-rose-950/5"
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          {/* Image & Badges */}
+                          <div className="relative w-full h-44 rounded-xl overflow-hidden bg-black/40 border border-white/5">
+                            <Image
+                              src={dish.image || dish.image_url}
+                              alt={dish.name}
+                              fill
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                              className="object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/20" />
+
+                            {/* 100% Pure Veg Badge */}
+                            <div className="absolute top-2.5 left-2.5 bg-black/85 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1.5 shadow-md">
+                              <div className="w-3 h-3 rounded-sm border border-green-500 flex items-center justify-center p-[2px]">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              </div>
+                              <span className="text-[10px] uppercase font-bold text-green-400">Pure Veg</span>
+                            </div>
+
+                            {/* Chef Special Highlight */}
+                            {dish.is_featured && (
+                              <div className="absolute top-2.5 right-2.5 bg-gold-gradient text-black text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                <span>Featured</span>
+                              </div>
+                            )}
+
+                            {/* Category Badge on Bottom Left */}
+                            <div className="absolute bottom-2 left-2.5 text-[10px] text-white/90 font-medium bg-black/70 backdrop-blur-md px-2.5 py-0.5 rounded-md border border-white/10">
+                              {categoryName}
+                            </div>
+                          </div>
+
+                          {/* Dish Name & Price (Phase 19 specification: Paneer Tikka / ₹249) */}
+                          <div className="space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="font-serif font-bold text-base text-[var(--text-main)] leading-snug">
+                                {dish.name}
+                              </h3>
+                              <span className="font-serif font-bold text-gold-gradient text-lg shrink-0">
+                                {formatCurrency(dish.price)}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-[var(--text-sub)] line-clamp-2 leading-relaxed">
+                              {dish.description}
+                            </p>
+                          </div>
+
+                          {/* Availability Status (Phase 19 specification: Available ✓) */}
+                          <div className="flex items-center justify-between pt-1">
+                            {isAvailable ? (
+                              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>Available ✓</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/30">
+                                <X className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>Disabled</span>
+                              </span>
+                            )}
+
+                            <span className="text-[10px] text-[var(--text-sub-light)] font-mono">
+                              ID: #{dish.id.slice(-6)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons (Phase 19 specification: [Edit] [Disable]) */}
+                        <div className="pt-3 border-t border-[var(--card-border)] flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {/* [Edit] Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(dish)}
+                              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-main)] bg-[var(--section-alt)] hover:bg-[#d4af37]/15 hover:text-[#d4af37] border border-[var(--card-border)] hover:border-[#d4af37]/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+
+                            {/* [Disable] / [Enable] Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAvailability(dish.id)}
+                              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                isAvailable
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20"
+                                  : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25"
+                              }`}
+                            >
+                              {isAvailable ? (
+                                <>
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                  <span>Disable</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Enable</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/menu/${dish.slug || dish.id}`}
+                              target="_blank"
+                              className="p-2 rounded-xl text-[var(--text-sub)] hover:text-[#d4af37] hover:bg-[var(--section-alt)] transition-colors"
+                              title="Customer live preview"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDish(dish.id, dish.name)}
+                              className="p-2 rounded-xl text-[var(--text-sub-light)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                              title="Delete dish"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -1160,6 +1536,240 @@ export default function AdminDashboardPage() {
           )}
         </main>
       </div>
+
+      {/* ==============================================================
+          PHASE 19 MODAL: ADD / EDIT MENU ITEM (Owner No-Code System)
+          ============================================================== */}
+      {isMenuModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-2xl p-6 sm:p-8 space-y-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--card-border)]">
+              <div>
+                <h3 className="text-xl font-serif font-bold text-[var(--text-main)]">
+                  {editingDish ? `Edit Item: ${editingDish.name}` : "Add New Menu Item"}
+                </h3>
+                <p className="text-xs text-[var(--text-sub)]">
+                  Changes update immediately on the customer menu without touching code.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMenuModalOpen(false)}
+                className="p-2 rounded-xl text-[var(--text-sub)] hover:text-white hover:bg-[var(--section-alt)] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Fields: Name, Description, Price, Category, Image, Vegetarian, Available, Featured */}
+            <form onSubmit={handleSaveDish} className="space-y-4">
+              {/* Field: Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                  <span>Name</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={dishForm.name}
+                  onChange={(e) => setDishForm({ ...dishForm, name: e.target.value })}
+                  placeholder="e.g. Paneer Tikka"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              {/* Field: Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                  <span>Description</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={dishForm.description}
+                  onChange={(e) => setDishForm({ ...dishForm, description: e.target.value })}
+                  placeholder="Grilled cottage cheese marinated in aromatic royal spices, roasted bell peppers, served hot..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37] resize-none"
+                />
+              </div>
+
+              {/* Row: Price & Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Field: Price */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>Price (₹)</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#d4af37] font-serif font-bold">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      step="1"
+                      value={dishForm.price}
+                      onChange={(e) => setDishForm({ ...dishForm, price: e.target.value })}
+                      placeholder="249"
+                      className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37] font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Field: Category */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>Category</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={dishForm.category_id}
+                    onChange={(e) => setDishForm({ ...dishForm, category_id: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-sm text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                  >
+                    {fallbackCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Field: Image URL with Presets and Live Preview */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                  <span>Image URL</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={dishForm.image}
+                  onChange={(e) => setDishForm({ ...dishForm, image: e.target.value })}
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+
+                {/* Quick High-Res Image Presets */}
+                <div className="space-y-1">
+                  <span className="text-[11px] text-[var(--text-sub)]">Quick Presets:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "Paneer Starter", url: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=800&q=80" },
+                      { label: "Dal Bukhara", url: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80" },
+                      { label: "Royal Biryani", url: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80" },
+                      { label: "Woodfire Pizza", url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80" },
+                      { label: "Shahi Dessert", url: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80" },
+                      { label: "Kesar Beverage", url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=800&q=80" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setDishForm({ ...dishForm, image: preset.url })}
+                        className="px-2.5 py-1 rounded-lg text-[10px] bg-[var(--section-alt)] text-[var(--text-sub)] hover:text-[#d4af37] border border-[var(--card-border)] hover:border-[#d4af37]/40 cursor-pointer"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview Thumbnail */}
+                {dishForm.image && (
+                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-[var(--card-border)] mt-2 bg-black/40">
+                    <Image
+                      src={dishForm.image}
+                      alt="Preview"
+                      fill
+                      className="object-cover"
+                    />
+                    <div className="absolute bottom-1 right-2 bg-black/70 px-2 py-0.5 rounded text-[10px] text-white">
+                      Live Image Preview
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Toggles: Vegetarian, Available, Featured */}
+              <div className="p-4 rounded-2xl bg-[var(--background)] border border-[var(--card-border)] space-y-3">
+                {/* Field: Vegetarian */}
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3.5 h-3.5 rounded-sm border border-green-500 flex items-center justify-center p-[2px]">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    </div>
+                    <span className="text-xs font-semibold text-[var(--text-main)]">
+                      Vegetarian (100% Pure Veg)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={dishForm.is_vegetarian}
+                    onChange={(e) => setDishForm({ ...dishForm, is_vegetarian: e.target.checked })}
+                    className="w-4 h-4 accent-[#d4af37] cursor-pointer"
+                  />
+                </label>
+
+                {/* Field: Available */}
+                <label className="flex items-center justify-between cursor-pointer border-t border-[var(--card-border)] pt-2.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs font-semibold text-[var(--text-main)]">
+                      Available (In Stock & Orderable)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={dishForm.is_available}
+                    onChange={(e) => setDishForm({ ...dishForm, is_available: e.target.checked })}
+                    className="w-4 h-4 accent-[#d4af37] cursor-pointer"
+                  />
+                </label>
+
+                {/* Field: Featured */}
+                <label className="flex items-center justify-between cursor-pointer border-t border-[var(--card-border)] pt-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />
+                    <span className="text-xs font-semibold text-[var(--text-main)]">
+                      Featured (Chef&apos;s Special Highlight)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={dishForm.is_featured}
+                    onChange={(e) => setDishForm({ ...dishForm, is_featured: e.target.checked })}
+                    className="w-4 h-4 accent-[#d4af37] cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {/* Action Buttons: [ SAVE ] */}
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsMenuModalOpen(false)}
+                  className="w-1/3 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] bg-[var(--section-alt)] hover:text-white border border-[var(--card-border)] transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-98 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-mono"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>[ SAVE ]</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

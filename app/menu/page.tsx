@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import FoodCard from "@/components/FoodCard";
 import { useCart } from "@/context/CartContext";
@@ -21,6 +21,35 @@ import { formatCurrency } from "@/utils/formatters";
 export default function MenuPage() {
   const { addToCart, updateQuantity, getItemQuantity, totalItems, subtotal } = useCart();
   
+  // Dynamic menu items loaded from admin storage / fallback
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(fallbackMenuItems);
+
+  useEffect(() => {
+    const loadDynamicMenu = () => {
+      if (typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem("nexora_admin_menu");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setMenuItems(parsed);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load admin menu", e);
+        }
+      }
+    };
+
+    loadDynamicMenu();
+    window.addEventListener("storage", loadDynamicMenu);
+    window.addEventListener("nexora_menu_updated", loadDynamicMenu);
+    return () => {
+      window.removeEventListener("storage", loadDynamicMenu);
+      window.removeEventListener("nexora_menu_updated", loadDynamicMenu);
+    };
+  }, []);
+
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -51,7 +80,7 @@ export default function MenuPage() {
 
   // Filtered menu items
   const filteredItems = useMemo(() => {
-    return fallbackMenuItems.filter((item) => {
+    return menuItems.filter((item) => {
       // 1. Category filter
       if (selectedCategory !== "all") {
         const category = fallbackCategories.find((c) => c.slug === selectedCategory);
@@ -76,15 +105,15 @@ export default function MenuPage() {
 
       return true;
     });
-  }, [selectedCategory, dietFilter, searchQuery]);
+  }, [menuItems, selectedCategory, dietFilter, searchQuery]);
 
   // Categories list with [All] at the start
   const categoryFilters = [
-    { slug: "all", name: "All", count: fallbackMenuItems.length },
+    { slug: "all", name: "All", count: menuItems.length },
     ...fallbackCategories.map((c) => ({
       slug: c.slug || c.id,
       name: c.name.replace("Royal ", "").replace("Woodfire ", "").replace(" & Elixirs", ""),
-      count: fallbackMenuItems.filter((item) => item.category_id === c.id).length,
+      count: menuItems.filter((item) => item.category_id === c.id).length,
     })),
   ];
 

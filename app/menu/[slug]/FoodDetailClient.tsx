@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,23 +32,44 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
   const router = useRouter();
   const { addToCart, totalItems, subtotal } = useCart();
 
+  // Dynamic dish sync with admin overrides
+  const [currentDish, setCurrentDish] = useState(item);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("nexora_admin_menu");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const match = parsed.find(
+            (p: any) =>
+              p.id === item.id ||
+              p.slug === item.slug ||
+              p.name.toLowerCase() === item.name.toLowerCase()
+          );
+          if (match) setCurrentDish(match);
+        }
+      } catch {}
+    }
+  }, [item]);
+
   const [quantity, setQuantity] = useState<number>(1);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
 
-  const isVeg = item.is_vegetarian ?? item.is_veg;
-  const imageSrc = item.image || item.image_url;
-  const rating = item.rating ?? 4.8;
-  const reviewCount = item.reviewCount ?? 128;
-  const unitPrice = item.discount_price ?? item.price;
+  const isVeg = currentDish.is_vegetarian ?? currentDish.is_veg;
+  const imageSrc = currentDish.image || currentDish.image_url;
+  const rating = currentDish.rating ?? 4.8;
+  const reviewCount = currentDish.reviewCount ?? 128;
+  const unitPrice = currentDish.discount_price ?? currentDish.price;
   const totalPrice = unitPrice * quantity;
 
   // Category name
-  const category = fallbackCategories.find((c) => c.id === item.category_id);
+  const category = fallbackCategories.find((c) => c.id === currentDish.category_id);
   const categoryName = category ? category.name : "Fine Dining";
 
   // Related items
-  const relatedItems = getRelatedMenuItems(item.category_id, item.id);
+  const relatedItems = getRelatedMenuItems(currentDish.category_id, currentDish.id);
 
   const handleDecrease = () => {
     if (quantity > 1) {
@@ -61,8 +82,8 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
   };
 
   const handleAddToCart = () => {
-    addToCart(item, quantity);
-    setToastMessage(`Added ${quantity} × ${item.name} to your cart`);
+    addToCart(currentDish, quantity);
+    setToastMessage(`Added ${quantity} × ${currentDish.name} to your cart`);
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
@@ -181,7 +202,7 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
 
                 {/* Dish Name */}
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-[var(--text-main)] leading-tight">
-                  {item.name}
+                  {currentDish.name}
                 </h1>
 
                 {/* Rating Display (⭐ 4.8) */}
@@ -197,16 +218,16 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
 
                 {/* Description */}
                 <p className="text-sm sm:text-base text-[var(--text-sub)] font-light leading-relaxed">
-                  {item.description}
+                  {currentDish.description}
                 </p>
 
                 {/* Meta Attributes: Prep Time, Spice Level, Calories */}
                 <div className="grid grid-cols-3 gap-3 pt-2 pb-1 border-y border-[#d4af37]/15 text-xs text-[var(--text-sub)]">
-                  {item.prep_time_minutes && (
+                  {currentDish.prep_time_minutes && (
                     <div className="flex flex-col items-center sm:items-start gap-1">
                       <span className="flex items-center gap-1 text-[var(--text-main)] font-semibold">
                         <Clock className="w-3.5 h-3.5 text-[#d4af37]" />
-                        <span>{item.prep_time_minutes} Mins</span>
+                        <span>{currentDish.prep_time_minutes} Mins</span>
                       </span>
                       <span className="text-[10px] uppercase tracking-wider text-[var(--text-sub)]">
                         Prep Time
@@ -214,11 +235,11 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
                     </div>
                   )}
 
-                  {item.spice_level && (
+                  {currentDish.spice_level && (
                     <div className="flex flex-col items-center sm:items-start gap-1">
                       <span className="flex items-center gap-1 text-[var(--text-main)] font-semibold capitalize">
                         <Flame className="w-3.5 h-3.5 text-orange-400" />
-                        <span>{item.spice_level}</span>
+                        <span>{currentDish.spice_level}</span>
                       </span>
                       <span className="text-[10px] uppercase tracking-wider text-[var(--text-sub)]">
                         Spice Level
@@ -226,11 +247,11 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
                     </div>
                   )}
 
-                  {item.calories && (
+                  {currentDish.calories && (
                     <div className="flex flex-col items-center sm:items-start gap-1">
                       <span className="flex items-center gap-1 text-[var(--text-main)] font-semibold">
                         <Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />
-                        <span>{item.calories} kcal</span>
+                        <span>{currentDish.calories} kcal</span>
                       </span>
                       <span className="text-[10px] uppercase tracking-wider text-[var(--text-sub)]">
                         Energy
@@ -244,9 +265,9 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
                   <span className="text-3xl sm:text-4xl font-serif font-bold text-gold-gradient">
                     {formatCurrency(unitPrice)}
                   </span>
-                  {item.discount_price && (
+                  {currentDish.discount_price && (
                     <span className="text-base text-[var(--text-sub)] line-through">
-                      {formatCurrency(item.price)}
+                      {formatCurrency(currentDish.price)}
                     </span>
                   )}
                   <span className="text-xs text-[var(--text-sub)]">
@@ -258,7 +279,7 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
               {/* Actions Section: Quantity & Add to Cart */}
               <div className="space-y-4 pt-4 border-t border-[#d4af37]/15">
                 {/* Unavailable Notice */}
-                {!item.is_available && (
+                {!currentDish.is_available && (
                   <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
                     <span>This dish is currently unavailable at our kitchen and will be introduced soon.</span>
@@ -266,7 +287,7 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
                 )}
 
                 {/* Quantity Controls */}
-                {item.is_available && (
+                {currentDish.is_available && (
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-widest text-[var(--text-main)] font-semibold">
                       Quantity
