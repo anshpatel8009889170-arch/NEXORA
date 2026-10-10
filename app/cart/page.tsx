@@ -514,7 +514,7 @@ export default function CartPage() {
                 }}
                 className="w-full py-4 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl"
               >
-                <span>Proceed to Checkout</span>
+                <span>Proceed Your Order</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

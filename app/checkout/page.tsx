@@ -1107,9 +1107,7 @@ export default function CheckoutPage() {
                   ) : (
                     <>
                       <span>
-                        {paymentMethod === "cod"
-                          ? `Place Royal Order • ${formatCurrency(grandTotal)}`
-                          : `Pay via Razorpay • ${formatCurrency(grandTotal)}`}
+                        Place Your Order • {formatCurrency(grandTotal)}
                       </span>
                       <ArrowRight className="w-4 h-4" />
                     </>
