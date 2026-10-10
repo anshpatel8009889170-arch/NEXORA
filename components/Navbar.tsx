@@ -76,7 +76,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-5">
             {/* Login / Profile Link */}
             <Link
-              href="/login"
+              href={isLoggedIn ? "/account" : "/login"}
               className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--text-main)] hover:text-[#d4af37] transition-colors px-2 py-1.5"
             >
               <User className="w-4 h-4 text-[#d4af37]" />
@@ -176,7 +176,7 @@ export default function Navbar() {
           </Link>
           <div className="pt-4 mt-2 border-t border-[var(--card-border)] flex items-center justify-between gap-3">
             <Link
-              href="/login"
+              href={isLoggedIn ? "/account" : "/login"}
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#d4af37] py-2 px-3 rounded-lg hover:bg-white/5"
             >
