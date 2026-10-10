@@ -47,9 +47,15 @@ import {
   Layers,
   Upload,
   Loader2,
+  Globe,
+  Mail,
+  DollarSign,
+  Percent,
+  Radio,
+  Store,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
-import { OrderStatus, MenuItem, Category, Offer } from "@/types/database";
+import { OrderStatus, MenuItem, Category, Offer, RestaurantSettings } from "@/types/database";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
 import { uploadDishImage } from "@/lib/storage";
 
@@ -133,6 +139,27 @@ const initialAdminOffers: Offer[] = [
     created_at: "2026-01-01T00:00:00.000Z",
   },
 ];
+
+const defaultAdminSettings: RestaurantSettings = {
+  id: "default",
+  name: "NEXORA Fine Dining",
+  phone: "+91 83038 90056",
+  phone_secondary: "+91 91204 89210",
+  email: "vaibhavpatel8543@gmail.com",
+  address: "Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra",
+  opening_hours: "11:00 AM – 11:30 PM (Mon – Sun)",
+  delivery_radius: "15 km",
+  minimum_order: 199,
+  delivery_fee: 40,
+  tax_percent: 5,
+  social_links: {
+    instagram: "https://instagram.com",
+    whatsapp: "https://wa.me/918303890056",
+    facebook: "https://facebook.com",
+    google_maps: "https://maps.google.com",
+  },
+  logo_url: "/logo.png",
+};
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -253,6 +280,12 @@ export default function AdminDashboardPage() {
     is_active: true,
   });
 
+  // Restaurant Settings State (Phase 23)
+  const [settingsForm, setSettingsForm] = useState<RestaurantSettings>(defaultAdminSettings);
+  const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
+  const [settingsSavedMessage, setSettingsSavedMessage] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
+
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -327,6 +360,36 @@ export default function AdminDashboardPage() {
             .catch(() => {});
         } catch (err) {
           console.warn("Error syncing admin offers from storage:", err);
+        }
+
+        // Load / Sync Restaurant Settings from localStorage & API (Phase 23)
+        try {
+          const storedSettings = localStorage.getItem("nexora_restaurant_settings");
+          if (storedSettings) {
+            const parsed = JSON.parse(storedSettings);
+            setSettingsForm((prev) => ({
+              ...prev,
+              ...parsed,
+              social_links: {
+                ...prev.social_links,
+                ...(parsed.social_links || {}),
+              },
+            }));
+          } else {
+            localStorage.setItem("nexora_restaurant_settings", JSON.stringify(defaultAdminSettings));
+          }
+
+          fetch("/api/settings")
+            .then((res) => res.json())
+            .then((json) => {
+              if (json.success && json.settings) {
+                setSettingsForm(json.settings);
+                localStorage.setItem("nexora_restaurant_settings", JSON.stringify(json.settings));
+              }
+            })
+            .catch(() => {});
+        } catch (err) {
+          console.warn("Error syncing restaurant settings:", err);
         }
       } catch (err) {
         console.warn("Error syncing admin categories from storage:", err);
@@ -461,6 +524,62 @@ export default function AdminDashboardPage() {
       });
     } catch (err) {
       console.warn("Could not sync offer to server:", err);
+    }
+  };
+
+  // ==========================================================
+  // PHASE 23: RESTAURANT SETTINGS HANDLERS (No-Code System)
+  // ==========================================================
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsSavedMessage(null);
+
+    const payload: RestaurantSettings = {
+      ...settingsForm,
+      minimum_order: Number(settingsForm.minimum_order) >= 0 ? Number(settingsForm.minimum_order) : 199,
+      delivery_fee: Number(settingsForm.delivery_fee) >= 0 ? Number(settingsForm.delivery_fee) : 40,
+      tax_percent: Number(settingsForm.tax_percent) >= 0 ? Number(settingsForm.tax_percent) : 5,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_restaurant_settings", JSON.stringify(payload));
+      window.dispatchEvent(new Event("nexora_settings_updated"));
+    }
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSettingsSavedMessage("✓ Settings saved! All website pages (Header, Footer, Cart, Checkout) updated in real-time.");
+      }
+    } catch {
+      setSettingsSavedMessage("✓ Settings saved locally! Website updated in real-time.");
+    } finally {
+      setIsSavingSettings(false);
+      setTimeout(() => setSettingsSavedMessage(null), 5000);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const result = await uploadDishImage(file, "menu-images");
+      if (result.url) {
+        setSettingsForm((prev) => ({ ...prev, logo_url: result.url }));
+      }
+    } catch (err) {
+      console.warn("Logo upload error:", err);
+    } finally {
+      setIsUploadingLogo(false);
     }
   };
 
@@ -2173,37 +2292,465 @@ export default function AdminDashboardPage() {
           {/* ==========================================================
               TAB: SETTINGS
               ========================================================== */}
+          {/* ==========================================================
+              TAB: SETTINGS (PHASE 23 - Restaurant Settings No-Code System)
+              ========================================================== */}
           {activeTab === "settings" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="pb-4 border-b border-[var(--card-border)]">
-                <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                  Restaurant Settings
-                </h2>
-                <p className="text-xs text-[var(--text-sub)]">
-                  Official contact, landmark address, and business hours.
-                </p>
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <Store className="w-5 h-5 text-[#d4af37]" />
+                    Restaurant Settings
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Owner Control Center &mdash; Update restaurant details, delivery fees, taxes, and logo without editing code.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  form="restaurant-settings-form"
+                  disabled={isSavingSettings}
+                  className="px-5 py-2.5 rounded-xl bg-gold-gradient text-black font-semibold text-xs flex items-center justify-center gap-2 shadow-md hover:opacity-90 active:scale-98 disabled:opacity-40 transition-all cursor-pointer font-mono"
+                >
+                  {isSavingSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>[ SAVE SETTINGS ]</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4 text-xs">
-                <div>
-                  <span className="text-[var(--text-sub)] block">Official Address:</span>
-                  <p className="font-semibold text-[var(--text-main)] pt-0.5">
-                    Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra
-                  </p>
+              {/* Success Notification Alert */}
+              {settingsSavedMessage && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 flex items-center gap-2.5 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span className="font-medium">{settingsSavedMessage}</span>
                 </div>
-                <div>
-                  <span className="text-[var(--text-sub)] block">Support Phone Numbers:</span>
-                  <p className="font-mono text-[var(--text-main)] pt-0.5">
-                    Restaurant Staff: +91 83038 90056 &bull; Delivery Boy: +91 91204 89210
-                  </p>
+              )}
+
+              <form id="restaurant-settings-form" onSubmit={handleSaveSettings} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* CARD 1: Brand & Identity */}
+                  <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4">
+                    <h3 className="text-sm font-serif font-bold text-[var(--text-main)] flex items-center gap-2 pb-2 border-b border-[var(--card-border)]">
+                      <Sparkles className="w-4 h-4 text-[#d4af37]" />
+                      <span>Branding &amp; Identity</span>
+                    </h3>
+
+                    {/* Restaurant Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                        Restaurant Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.name}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, name: e.target.value })}
+                        placeholder="NEXORA Fine Dining"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                      />
+                    </div>
+
+                    {/* Official Email */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                        Official Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={settingsForm.email}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, email: e.target.value })}
+                        placeholder="vaibhavpatel8543@gmail.com"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                      />
+                    </div>
+
+                    {/* Restaurant Logo */}
+                    <div className="space-y-2 pt-1">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center justify-between">
+                        <span>Restaurant Logo</span>
+                        <span className="text-[10px] text-[var(--text-sub)] font-normal">Supabase Storage / URL</span>
+                      </label>
+
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16 rounded-2xl overflow-hidden border border-[#d4af37]/40 bg-black/40 shrink-0 shadow-md">
+                          <Image
+                            src={settingsForm.logo_url || "/logo.png"}
+                            alt="Logo Preview"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+
+                        <div className="flex-1 space-y-1.5">
+                          <input
+                            type="text"
+                            value={settingsForm.logo_url}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, logo_url: e.target.value })}
+                            placeholder="/logo.png or Supabase CDN URL"
+                            className="w-full px-3.5 py-2 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                          />
+                          <div className="flex items-center gap-2">
+                            <label className="px-3 py-1 rounded-lg text-[10px] font-semibold bg-[var(--section-alt)] text-[#d4af37] border border-[#d4af37]/30 hover:bg-[#d4af37]/10 cursor-pointer flex items-center gap-1.5 transition-all">
+                              <Upload className="w-3 h-3" />
+                              <span>{isUploadingLogo ? "Uploading..." : "Upload New Logo"}</span>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                onChange={handleLogoUpload}
+                                disabled={isUploadingLogo}
+                                className="hidden"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsForm({ ...settingsForm, logo_url: "/logo.png" })}
+                              className="px-2.5 py-1 rounded-lg text-[10px] text-[var(--text-sub)] hover:text-white border border-[var(--card-border)] cursor-pointer"
+                            >
+                              Reset to Default
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: Contact & Support (Two Dedicated Numbers) */}
+                  <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4">
+                    <h3 className="text-sm font-serif font-bold text-[var(--text-main)] flex items-center gap-2 pb-2 border-b border-[var(--card-border)]">
+                      <Phone className="w-4 h-4 text-[#d4af37]" />
+                      <span>Dedicated Phone Numbers</span>
+                    </h3>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center justify-between">
+                        <span>Restaurant Worker / Staff Phone *</span>
+                        <span className="text-[10px] text-emerald-400 font-normal">Kitchen &amp; Manager</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={settingsForm.phone}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
+                        placeholder="+91 83038 90056"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)] flex items-center justify-between">
+                        <span>Delivery Boy / Dispatcher Phone</span>
+                        <span className="text-[10px] text-amber-400 font-normal">Rider &amp; Order Delivery</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsForm.phone_secondary || ""}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, phone_secondary: e.target.value })}
+                        placeholder="+91 91204 89210"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[11px] text-[var(--text-sub)]">
+                      <p className="leading-relaxed">
+                        <strong className="text-[var(--text-main)]">Auto-sync Note:</strong> Both numbers appear automatically on customer order tracking and instant support modal.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* CARD 3: Location & Operational Timings */}
+                  <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4">
+                    <h3 className="text-sm font-serif font-bold text-[var(--text-main)] flex items-center gap-2 pb-2 border-b border-[var(--card-border)]">
+                      <MapPin className="w-4 h-4 text-[#d4af37]" />
+                      <span>Address &amp; Operating Timings</span>
+                    </h3>
+
+                    {/* Address */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                        Full Physical Address *
+                      </label>
+                      <textarea
+                        rows={2}
+                        required
+                        value={settingsForm.address}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                        placeholder="Sathigva, Amauli-Fatehpur Road..."
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37] resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Opening Hours */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Opening Hours *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.opening_hours}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, opening_hours: e.target.value })}
+                          placeholder="11:00 AM – 11:30 PM (Mon – Sun)"
+                          className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+
+                      {/* Delivery Radius */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Delivery Radius *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={settingsForm.delivery_radius}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, delivery_radius: e.target.value })}
+                          placeholder="15 km"
+                          className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 4: Order Economics & Taxation */}
+                  <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4">
+                    <h3 className="text-sm font-serif font-bold text-[var(--text-main)] flex items-center gap-2 pb-2 border-b border-[var(--card-border)]">
+                      <DollarSign className="w-4 h-4 text-[#d4af37]" />
+                      <span>Order Economics &amp; Charges</span>
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Minimum Order */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Min Order (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={settingsForm.minimum_order}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, minimum_order: Number(e.target.value) })}
+                          placeholder="199"
+                          className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+
+                      {/* Delivery Fee */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Delivery Fee (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={settingsForm.delivery_fee}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, delivery_fee: Number(e.target.value) })}
+                          placeholder="40"
+                          className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                        <span className="text-[10px] text-[var(--text-sub-light)] block">Set 0 for free delivery</span>
+                      </div>
+
+                      {/* Tax / GST Rate */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          GST / Tax Rate (%) *
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="28"
+                          required
+                          value={settingsForm.tax_percent}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, tax_percent: Number(e.target.value) })}
+                          placeholder="5"
+                          className="w-full px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                        <span className="text-[10px] text-[var(--text-sub-light)] block">Standard 5% restaurant GST</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[11px] text-[var(--text-sub)]">
+                      <p>
+                        Cart subtotal and checkout automatically calculate delivery charges and minimum order constraints using these exact figures.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* CARD 5: Social Media & Discovery Links */}
+                  <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] space-y-4 lg:col-span-2">
+                    <h3 className="text-sm font-serif font-bold text-[var(--text-main)] flex items-center gap-2 pb-2 border-b border-[var(--card-border)]">
+                      <Globe className="w-4 h-4 text-[#d4af37]" />
+                      <span>Social Media Profiles &amp; Direct Links</span>
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Instagram */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Instagram URL
+                        </label>
+                        <input
+                          type="url"
+                          value={settingsForm.social_links?.instagram || ""}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              social_links: {
+                                ...settingsForm.social_links,
+                                instagram: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="https://instagram.com/nexora_restaurant"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+
+                      {/* WhatsApp */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          WhatsApp Link
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsForm.social_links?.whatsapp || ""}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              social_links: {
+                                ...settingsForm.social_links,
+                                whatsapp: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="https://wa.me/918303890056"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+
+                      {/* Facebook */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Facebook Page
+                        </label>
+                        <input
+                          type="url"
+                          value={settingsForm.social_links?.facebook || ""}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              social_links: {
+                                ...settingsForm.social_links,
+                                facebook: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="https://facebook.com/nexora"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+
+                      {/* Google Maps */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">
+                          Google Maps URL
+                        </label>
+                        <input
+                          type="url"
+                          value={settingsForm.social_links?.google_maps || ""}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              social_links: {
+                                ...settingsForm.social_links,
+                                google_maps: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="https://maps.google.com/..."
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--card-border)] text-xs text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 6: Live Customer View Preview */}
+                  <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 space-y-4 lg:col-span-2 shadow-sm">
+                    <h3 className="text-sm font-serif font-bold text-[#d4af37] flex items-center gap-2 pb-2 border-b border-[var(--card-border)]">
+                      <Store className="w-4 h-4" />
+                      <span>Live Website Brand Preview (How Customers See Your Restaurant)</span>
+                    </h3>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[var(--background)] border border-[var(--card-border)]">
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-[#d4af37]/30 bg-black/40 shrink-0">
+                          <Image
+                            src={settingsForm.logo_url || "/logo.png"}
+                            alt="Logo"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-serif font-bold text-base text-gold-gradient">
+                            {settingsForm.name}
+                          </h4>
+                          <p className="text-xs text-[var(--text-sub)]">
+                            {settingsForm.address}
+                          </p>
+                          <p className="text-[11px] font-mono text-[#d4af37] mt-0.5">
+                            {settingsForm.phone} {settingsForm.phone_secondary && `• ${settingsForm.phone_secondary}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex sm:flex-col items-end gap-2 text-right">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          {settingsForm.opening_hours}
+                        </span>
+                        <span className="text-[11px] text-[var(--text-sub)]">
+                          Delivery: <strong className="text-[var(--text-main)]">₹{settingsForm.delivery_fee}</strong> &bull; Min: <strong className="text-[var(--text-main)]">₹{settingsForm.minimum_order}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[var(--text-sub)] block">Official Email:</span>
-                  <p className="font-mono text-[var(--text-main)] pt-0.5">
-                    vaibhavpatel8543@gmail.com
-                  </p>
+
+                {/* Bottom Submit Button */}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isSavingSettings}
+                    className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gold-gradient text-black font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:opacity-90 active:scale-98 disabled:opacity-40 transition-all cursor-pointer font-mono"
+                  >
+                    {isSavingSettings ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving Restaurant Settings...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        <span>[ SAVE RESTAURANT SETTINGS ]</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
+              </form>
             </div>
           )}
         </main>

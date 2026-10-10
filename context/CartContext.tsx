@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { MenuItem, CartItem } from "@/types/database";
+import { useRestaurantSettings } from "@/context/SettingsContext";
 
 export interface AppliedCoupon {
   code: string;
@@ -146,8 +147,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return sum + price * ci.quantity;
   }, 0);
 
-  // Delivery fee: Flat ₹40 when cart has items (as specified in user requirements)
-  const deliveryFee = items.length > 0 ? 40 : 0;
+  const { settings } = useRestaurantSettings();
+
+  // Delivery fee: Dynamic from restaurant settings (defaults to ₹40)
+  const configuredFee = typeof settings?.delivery_fee === "number" ? settings.delivery_fee : 40;
+  const deliveryFee = items.length > 0 ? configuredFee : 0;
 
   // Calculate discount amount
   let discountAmount = 0;

@@ -3,8 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Phone, Mail, MapPin, Clock, Globe, MessageCircle } from "lucide-react";
+import { useRestaurantSettings } from "@/context/SettingsContext";
 
 export default function Footer() {
+  const { settings } = useRestaurantSettings();
+
   return (
     <footer className="bg-[var(--section-alt)] border-t border-[var(--card-border)] text-[var(--text-sub)] pt-16 pb-12 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -14,14 +17,14 @@ export default function Footer() {
             <div className="flex items-center gap-3">
               <div className="relative w-10 h-10 rounded-full overflow-hidden shadow-md">
                 <Image
-                  src="/logo.png"
-                  alt="NEXORA Logo"
+                  src={settings.logo_url || "/logo.png"}
+                  alt={`${settings.name} Logo`}
                   fill
                   className="object-cover"
                 />
               </div>
               <span className="text-xl font-serif tracking-[0.25em] text-gold-gradient font-bold">
-                NEXORA
+                {settings.name.split(" ")[0]}
               </span>
             </div>
             <p className="text-xs leading-relaxed text-[var(--text-sub)]">
@@ -29,24 +32,28 @@ export default function Footer() {
               fine-dining journey prepared by our master chefs using the finest ingredients.
             </p>
             <div className="flex items-center gap-3 pt-2 text-[#d4af37]">
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
-                aria-label="Website"
-              >
-                <Globe className="w-4 h-4" />
-              </a>
-              <a
-                href="https://wa.me/918303890056"
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
-                aria-label="WhatsApp"
-              >
-                <MessageCircle className="w-4 h-4" />
-              </a>
+              {settings.social_links?.instagram && (
+                <a
+                  href={settings.social_links.instagram}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
+                  aria-label="Instagram"
+                >
+                  <Globe className="w-4 h-4" />
+                </a>
+              )}
+              {settings.social_links?.whatsapp && (
+                <a
+                  href={settings.social_links.whatsapp}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/20 hover:border-[#d4af37] transition-all"
+                  aria-label="WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -93,16 +100,13 @@ export default function Footer() {
               <div className="flex items-start gap-2">
                 <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-[var(--text-main)]">Monday — Friday</p>
-                  <p className="text-[11px] text-[var(--text-sub-light)]">12:00 PM – 11:30 PM</p>
+                  <p className="font-medium text-[var(--text-main)]">Daily Operating Hours</p>
+                  <p className="text-[11px] text-[var(--text-sub-light)]">{settings.opening_hours}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2 pt-2">
-                <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-[var(--text-main)]">Saturday — Sunday</p>
-                  <p className="text-[11px] text-[var(--text-sub-light)]">11:30 AM – 12:30 AM</p>
-                </div>
+              <div className="pt-1 text-[11px] text-[var(--text-sub-light)]">
+                <span>Delivery Radius: </span>
+                <span className="text-[#d4af37] font-semibold">{settings.delivery_radius}</span>
               </div>
             </div>
           </div>
@@ -115,24 +119,35 @@ export default function Footer() {
             <div className="space-y-2.5 text-xs text-[var(--text-sub)]">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-                <p>Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra</p>
+                <p>{settings.address}</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-[#d4af37] shrink-0" />
                 <a
-                  href="tel:+918303890056"
+                  href={`tel:${settings.phone.replace(/\s+/g, "")}`}
                   className="hover:text-[#d4af37] transition-colors"
                 >
-                  +91 83038 90056
+                  {settings.phone}
                 </a>
               </div>
+              {settings.phone_secondary && (
+                <div className="flex items-center gap-2.5 pl-6 text-[11px] text-[var(--text-sub-light)]">
+                  <span>Delivery Support:</span>
+                  <a
+                    href={`tel:${settings.phone_secondary.replace(/\s+/g, "")}`}
+                    className="hover:text-[#d4af37] font-mono transition-colors"
+                  >
+                    {settings.phone_secondary}
+                  </a>
+                </div>
+              )}
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-[#d4af37] shrink-0" />
                 <a
-                  href="mailto:vaibhavpatel8543@gmail.com"
+                  href={`mailto:${settings.email}`}
                   className="hover:text-[#d4af37] transition-colors"
                 >
-                  vaibhavpatel8543@gmail.com
+                  {settings.email}
                 </a>
               </div>
             </div>

@@ -6,11 +6,13 @@ import Link from "next/link";
 import { ShoppingBag, Menu, X, User, Sparkles } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useRestaurantSettings } from "@/context/SettingsContext";
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const { isLoggedIn, profile } = useAuth();
+  const { settings } = useRestaurantSettings();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] transition-colors duration-200">
@@ -20,8 +22,8 @@ export default function Navbar() {
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-12 h-12 rounded-full overflow-hidden shadow-md group-hover:scale-105 transition-all duration-300">
               <Image
-                src="/logo.png"
-                alt="NEXORA Logo"
+                src={settings.logo_url || "/logo.png"}
+                alt={`${settings.name} Logo`}
                 fill
                 className="object-cover"
                 priority
@@ -29,10 +31,10 @@ export default function Navbar() {
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-serif tracking-[0.25em] text-gold-gradient font-bold">
-                NEXORA
+                {settings.name.split(" ")[0]}
               </span>
               <span className="text-[10px] tracking-[0.3em] text-[#d4af37]/70 uppercase -mt-1">
-                Fine Dining & Lounge
+                {settings.name.includes(" ") ? settings.name.slice(settings.name.indexOf(" ") + 1) : "Fine Dining & Lounge"}
               </span>
             </div>
           </Link>

@@ -165,3 +165,26 @@ export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
 }
+
+// 10. RESTAURANT SETTINGS (PHASE 23)
+export interface RestaurantSettings {
+  id?: string;
+  name: string;
+  phone: string;
+  phone_secondary?: string;
+  email: string;
+  address: string;
+  opening_hours: string;
+  delivery_radius: string;
+  minimum_order: number;
+  delivery_fee: number;
+  tax_percent: number;
+  social_links: {
+    instagram?: string;
+    whatsapp?: string;
+    facebook?: string;
+    google_maps?: string;
+  };
+  logo_url: string;
+  updated_at?: string;
+}
