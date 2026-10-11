@@ -16,6 +16,9 @@ import {
   Lock,
   ChevronRight,
   RefreshCw,
+  LogIn,
+  UserPlus,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
@@ -38,11 +41,15 @@ function LoginContent() {
 
   const { addToCart } = useCart();
 
-  // Steps: "phone" | "otp" | "name"
-  const [step, setStep] = useState<"phone" | "otp" | "name">("phone");
+  // Mode: "login" (Sign In) vs "signup" (Create Account)
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  // Steps: "phone" | "otp" | "details"
+  const [step, setStep] = useState<"phone" | "otp" | "details">("phone");
   const [phoneInput, setPhoneInput] = useState("");
   const [otpInput, setOtpInput] = useState("");
   const [nameInput, setNameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,11 +84,11 @@ function LoginContent() {
     setIsSubmitting(false);
 
     if (res.success) {
-      setSuccessMessage(res.message || "OTP sent successfully!");
+      setSuccessMessage(res.message || "Verification code dispatched successfully!");
       setStep("otp");
       setTimer(30);
     } else {
-      setErrorMessage(res.message || "Failed to send OTP. Please try again.");
+      setErrorMessage(res.message || "Failed to dispatch verification code. Please try again.");
     }
   };
 
@@ -102,11 +109,19 @@ function LoginContent() {
 
     if (res.success) {
       if (res.isNewUser) {
-        setStep("name");
-        setSuccessMessage("Phone verified! Please enter your name.");
+        setStep("details");
+        if (authMode === "signup") {
+          setSuccessMessage("Phone verified! Enter your name to complete account registration.");
+        } else {
+          setSuccessMessage("New royal patron detected! Please complete your name to continue.");
+        }
       } else {
         processPendingCartItem();
-        setSuccessMessage("Authentication successful! Welcome to NEXORA.");
+        if (authMode === "signup") {
+          setSuccessMessage("Account recognized! Welcome back to NEXORA.");
+        } else {
+          setSuccessMessage("Authentication successful! Welcome to NEXORA.");
+        }
         setTimeout(() => {
           router.push(redirectPath);
         }, 800);
@@ -134,28 +149,35 @@ function LoginContent() {
     }
   };
 
-  // Handle Profile Name Submission
-  const handleSaveName = async (e: React.FormEvent) => {
+  // Handle Profile Details (Name mandatory, Email optional)
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!nameInput.trim()) {
+    const trimmedName = nameInput.trim();
+    if (!trimmedName) {
       setErrorMessage("Please enter your full name.");
       return;
     }
 
+    const trimmedEmail = emailInput.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage("Please enter a valid email address, or leave it blank.");
+      return;
+    }
+
     setIsSubmitting(true);
-    const res = await updateProfileName(nameInput.trim());
+    const res = await updateProfileName(trimmedName, trimmedEmail || undefined);
     setIsSubmitting(false);
 
     if (res.success) {
       processPendingCartItem();
-      setSuccessMessage("Profile personalized! Redirecting...");
+      setSuccessMessage("Royal profile established! Redirecting to your order...");
       setTimeout(() => {
         router.push(redirectPath);
       }, 800);
     } else {
-      setErrorMessage(res.message || "Failed to save profile name.");
+      setErrorMessage(res.message || "Failed to save profile details.");
     }
   };
 
@@ -194,6 +216,11 @@ function LoginContent() {
             <p className="text-xs text-[var(--text-sub)] font-mono">
               {user?.phone || profile.phone}
             </p>
+            {profile.email && (
+              <p className="text-xs text-[var(--text-sub-light)] font-sans">
+                {profile.email}
+              </p>
+            )}
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-xs text-left space-y-2">
@@ -229,7 +256,7 @@ function LoginContent() {
             <button
               type="button"
               onClick={signOut}
-              className="w-full py-2.5 text-xs text-rose-400 hover:text-rose-300 transition-colors flex items-center justify-center gap-1.5 pt-2"
+              className="w-full py-2.5 text-xs text-rose-400 hover:text-rose-300 transition-colors flex items-center justify-center gap-1.5 pt-2 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign Out from Device</span>
@@ -240,32 +267,75 @@ function LoginContent() {
     );
   }
 
-  // LOGIN / OTP / NAME FORM
+  // LOGIN / CREATE ACCOUNT / OTP / DETAILS FORM
   return (
     <div className="max-w-md mx-auto py-12 animate-in fade-in duration-300">
       <div className="p-8 sm:p-9 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-2xl space-y-6 gold-glow-sm">
+        {/* MODE SWITCHER TABS (Sign In vs Create Account) */}
+        {step === "phone" && (
+          <div className="grid grid-cols-2 p-1 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)]">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("login");
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className={`py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                authMode === "login"
+                  ? "bg-gold-gradient text-black shadow-md font-bold"
+                  : "text-[var(--text-sub)] hover:text-[var(--text-main)]"
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("signup");
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className={`py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                authMode === "signup"
+                  ? "bg-gold-gradient text-black shadow-md font-bold"
+                  : "text-[var(--text-sub)] hover:text-[var(--text-main)]"
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Create Account</span>
+            </button>
+          </div>
+        )}
+
         {/* Header Badge */}
         <div className="text-center space-y-2">
           <div className="w-14 h-14 mx-auto rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] shadow-inner mb-3">
-            {step === "phone" && <Phone className="w-6 h-6" />}
-            {step === "otp" && <Lock className="w-6 h-6" />}
-            {step === "name" && <User className="w-6 h-6" />}
+            {step === "phone" && (authMode === "login" ? <Lock className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />)}
+            {step === "otp" && <Phone className="w-6 h-6" />}
+            {step === "details" && <User className="w-6 h-6" />}
           </div>
 
           <span className="text-[10px] uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
-            NEXORA Pure Gourmet Access
+            {step === "phone" && (authMode === "login" ? "NEXORA Royal Access" : "New Royal Patron")}
+            {step === "otp" && "Encrypted Phone Verification"}
+            {step === "details" && "Guest Profile Personalization"}
           </span>
 
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[var(--text-main)]">
-            {step === "phone" && "Customer Login"}
-            {step === "otp" && "Verify Phone"}
-            {step === "name" && "Welcome to NEXORA"}
+            {step === "phone" && (authMode === "login" ? "Patron Sign In" : "Create Account")}
+            {step === "otp" && "Verify Mobile"}
+            {step === "details" && "Welcome to NEXORA"}
           </h1>
 
           <p className="text-xs text-[var(--text-sub)] leading-relaxed">
-            {step === "phone" && "Enter your 10-digit mobile number. We will send you an OTP for instant secure verification."}
+            {step === "phone" &&
+              (authMode === "login"
+                ? "Enter your 10-digit mobile number to access your account and orders."
+                : "Enter your 10-digit mobile number to create your royal dining profile.")}
             {step === "otp" && `Enter the 6-digit verification code sent to +91 ${phoneInput}.`}
-            {step === "name" && "Tell us your name so we can personalize your royal order and fine dining delivery."}
+            {step === "details" && "Tell us your name for fine dining delivery. Email is optional."}
           </p>
         </div>
 
@@ -284,13 +354,18 @@ function LoginContent() {
           </div>
         )}
 
-        {/* STEP 1: PHONE NUMBER INPUT */}
+        {/* STEP 1: PHONE NUMBER INPUT (MANDATORY) */}
         {step === "phone" && (
           <form onSubmit={handleSendOtp} className="space-y-4">
             <div className="space-y-1.5 text-left">
-              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
-                Mobile Number
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
+                  Mobile Number
+                </label>
+                <span className="text-[10px] text-amber-400 font-medium tracking-wide">
+                  Required
+                </span>
+              </div>
               <div className="flex rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] overflow-hidden focus-within:border-[#d4af37] transition-all">
                 <span className="px-3.5 py-3 text-xs font-medium text-[var(--text-sub)] border-r border-[var(--card-border)] flex items-center gap-1.5">
                   <span>🇮🇳</span>
@@ -301,34 +376,72 @@ function LoginContent() {
                   maxLength={10}
                   value={phoneInput}
                   onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Enter 10-digit phone"
+                  placeholder="Enter 10-digit mobile"
                   className="w-full text-sm font-mono tracking-wider px-3.5 py-3 bg-transparent text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none"
                   autoFocus
                 />
               </div>
+              <p className="text-[11px] text-[var(--text-sub-light)] pt-0.5">
+                Bina mobile number ke verification sambhav nahi hai.
+              </p>
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting || phoneInput.length < 10}
-              className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg"
+              className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               {isSubmitting ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Sending OTP...</span>
+                  <span>Dispatching OTP...</span>
                 </>
               ) : (
                 <>
-                  <span>Send Verification Code</span>
+                  <span>{authMode === "login" ? "Send Sign In OTP" : "Send Verification OTP"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
+
+            {/* Quick Helper Switcher */}
+            <div className="pt-2 text-center">
+              {authMode === "login" ? (
+                <p className="text-xs text-[var(--text-sub)]">
+                  New to NEXORA?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signup");
+                      setErrorMessage(null);
+                      setSuccessMessage(null);
+                    }}
+                    className="text-[#d4af37] font-semibold hover:underline cursor-pointer"
+                  >
+                    Create Account
+                  </button>
+                </p>
+              ) : (
+                <p className="text-xs text-[var(--text-sub)]">
+                  Already registered?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("login");
+                      setErrorMessage(null);
+                      setSuccessMessage(null);
+                    }}
+                    className="text-[#d4af37] font-semibold hover:underline cursor-pointer"
+                  >
+                    Sign In
+                  </button>
+                </p>
+              )}
+            </div>
           </form>
         )}
 
-        {/* STEP 2: 6-DIGIT OTP INPUT */}
+        {/* STEP 2: 6-DIGIT OTP INPUT (MANDATORY) */}
         {step === "otp" && (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div className="space-y-1.5 text-left">
@@ -343,7 +456,7 @@ function LoginContent() {
                     setOtpInput("");
                     setErrorMessage(null);
                   }}
-                  className="text-[11px] text-[#d4af37] hover:underline"
+                  className="text-[11px] text-[#d4af37] hover:underline cursor-pointer"
                 >
                   Change number
                 </button>
@@ -363,7 +476,7 @@ function LoginContent() {
             <button
               type="submit"
               disabled={isSubmitting || otpInput.length < 6}
-              className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg"
+              className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               {isSubmitting ? (
                 <>
@@ -389,7 +502,7 @@ function LoginContent() {
                   type="button"
                   onClick={handleSendOtp}
                   disabled={isSubmitting}
-                  className="text-xs text-[#d4af37] font-medium hover:underline"
+                  className="text-xs text-[#d4af37] font-medium hover:underline cursor-pointer"
                 >
                   Resend OTP Code
                 </button>
@@ -398,33 +511,75 @@ function LoginContent() {
           </form>
         )}
 
-        {/* STEP 3: FULL NAME (PROFILE CREATION FOR NEW GUEST) */}
-        {step === "name" && (
-          <form onSubmit={handleSaveName} className="space-y-4">
+        {/* STEP 3: DETAILS (NAME REQUIRED, EMAIL OPTIONAL) */}
+        {step === "details" && (
+          <form onSubmit={handleSaveProfile} className="space-y-4">
+            {/* Verified Mobile Confirmation Banner */}
+            <div className="p-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <Phone className="w-3.5 h-3.5 text-[#d4af37]" />
+                <span className="font-mono text-[var(--text-main)]">+91 {phoneInput}</span>
+              </div>
+              <span className="text-emerald-400 font-semibold flex items-center gap-1 text-[11px]">
+                <CheckCircle2 className="w-3 h-3" /> Verified
+              </span>
+            </div>
+
+            {/* 1. Full Name (Mandatory) */}
             <div className="space-y-1.5 text-left">
-              <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
-                Your Full Name
-              </label>
-              <input
-                type="text"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                placeholder="e.g. Ansh Patel"
-                className="w-full text-sm px-4 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
-                autoFocus
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
+                  Full Name
+                </label>
+                <span className="text-[10px] text-amber-400 font-medium">Required</span>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="e.g. Ansh Patel"
+                  className="w-full text-sm px-4 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* 2. Email Address (Optional) */}
+            <div className="space-y-1.5 text-left">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider">
+                  Email Address
+                </label>
+                <span className="text-[10px] text-[var(--text-sub-light)] font-medium">Optional</span>
+              </div>
+              <div className="relative flex items-center">
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="patron@example.com (for invoices)"
+                  className="w-full text-sm px-4 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+              <p className="text-[11px] text-[var(--text-sub-light)]">
+                Optional: Receive GST invoice and digital delivery updates on your email.
+              </p>
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting || !nameInput.trim()}
-              className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg"
+              className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               {isSubmitting ? (
-                <span>Saving Profile...</span>
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving Profile...</span>
+                </>
               ) : (
                 <>
-                  <span>Complete & Continue</span>
+                  <span>Complete Registration & Continue</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -435,7 +590,7 @@ function LoginContent() {
         {/* Assurance */}
         <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-center gap-2 text-[11px] text-[var(--text-sub-light)]">
           <ShieldCheck className="w-3.5 h-3.5 text-[#d4af37]" />
-          <span>Encrypted Phone Verification • No Password Required</span>
+          <span>Password-Free Instant OTP Verification • 100% Secure</span>
         </div>
       </div>
     </div>
@@ -451,7 +606,7 @@ export default function LoginPage() {
             Home
           </Link>
           <ChevronRight className="w-3 h-3 text-[var(--text-sub-light)]" />
-          <span className="text-[#d4af37] font-medium">Customer Login</span>
+          <span className="text-[#d4af37] font-medium">Customer Login & Register</span>
         </div>
 
         <Suspense

@@ -30,7 +30,7 @@ import { Offer } from "@/types/database";
 
 export default function CartPage() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, isLoggedIn } = useAuth();
   const {
     items,
     totalItems,
@@ -548,12 +548,15 @@ export default function CartPage() {
               <button
                 type="button"
                 onClick={() => {
-                  // Navigate to checkout or notify
-                  router.push("/checkout");
+                  if (!isLoggedIn) {
+                    router.push("/login?redirect=/checkout");
+                  } else {
+                    router.push("/checkout");
+                  }
                 }}
-                className="w-full py-4 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl"
+                className="w-full py-4 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl cursor-pointer"
               >
-                <span>Proceed Your Order</span>
+                <span>{isLoggedIn ? "Proceed Your Order" : "Login to Proceed Order"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

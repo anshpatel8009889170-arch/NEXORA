@@ -114,6 +114,13 @@ export default function CheckoutPage() {
     return () => clearInterval(interval);
   }, [timer]);
 
+  // Order Gate: Redirect unauthenticated customers to login before checkout
+  useEffect(() => {
+    if (!authLoading && !isLoggedIn && !placedOrderNumber) {
+      router.replace("/login?redirect=/checkout");
+    }
+  }, [authLoading, isLoggedIn, placedOrderNumber, router]);
+
 
   // Auth Handler: Send OTP
   const handleSendOtp = async (e: React.FormEvent) => {

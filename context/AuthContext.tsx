@@ -67,7 +67,7 @@ interface AuthContextType {
   deleteSavedAddress: (id: string) => void;
   sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; mockOtp?: string }>;
   verifyOtp: (phone: string, token: string) => Promise<{ success: boolean; message?: string; isNewUser?: boolean }>;
-  updateProfileName: (fullName: string) => Promise<{ success: boolean; message?: string }>;
+  updateProfileName: (fullName: string, email?: string) => Promise<{ success: boolean; message?: string }>;
   saveDeliveryAddress: (address: DeliveryAddressData) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -418,8 +418,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Update customer name in profile
-  const updateProfileName = async (fullName: string): Promise<{ success: boolean; message?: string }> => {
+  // Update customer name and optional email in profile
+  const updateProfileName = async (
+    fullName: string,
+    email?: string
+  ): Promise<{ success: boolean; message?: string }> => {
     if (!user) {
       return { success: false, message: "No active user session found." };
     }
@@ -428,6 +431,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!trimmed) {
       return { success: false, message: "Please enter your name." };
     }
+
+    const cleanEmail = email ? email.trim() : (profile?.email || null);
 
     try {
       const updatedProfile: Profile = {
@@ -438,6 +443,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
         full_name: trimmed,
         phone: user.phone || profile?.phone,
+        email: cleanEmail,
       };
 
       setProfile(updatedProfile);
@@ -452,6 +458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: user.id,
           full_name: trimmed,
           phone: user.phone,
+          email: cleanEmail,
           updated_at: new Date().toISOString(),
         });
       } catch (e) {
