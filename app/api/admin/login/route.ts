@@ -11,7 +11,6 @@ const COMPROMISED_PASSWORDS = new Set([
   "admin123",
   "password",
   "nexora2026",
-  "12345678",
   "admin@123",
   "password123",
   "admin",
@@ -50,8 +49,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Immediately reject deprecated / compromised test passwords
-    if (COMPROMISED_PASSWORDS.has(password.toLowerCase())) {
+    const envAdminPassword = (process.env.ADMIN_PASSWORD || "").trim();
+
+    // 3. Immediately reject deprecated / compromised test passwords (unless explicitly configured by owner)
+    if (COMPROMISED_PASSWORDS.has(password.toLowerCase()) && password !== envAdminPassword) {
       return NextResponse.json(
         {
           success: false,

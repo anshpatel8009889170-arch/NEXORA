@@ -300,7 +300,7 @@ async function runAdminTests() {
 
   // 2.1 Admin Login
   try {
-    const adminPassword = process.env.ADMIN_PASSWORD || "Nexora@Admin2026!SecureKey";
+    const adminPassword = process.env.ADMIN_PASSWORD || "12345678";
     const res = await fetch(`${BASE_URL}/api/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
