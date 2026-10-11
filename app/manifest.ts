@@ -20,11 +20,6 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
       },
-      {
-        src: "/logo.png",
-        sizes: "627x627",
-        type: "image/png",
-      },
     ],
   };
 }
