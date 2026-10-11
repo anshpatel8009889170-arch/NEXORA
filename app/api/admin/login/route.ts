@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { validateEmail, sanitizeString } from "@/lib/security/validation";
 import { setAdminCookieOnResponse, AdminRole } from "@/lib/security/adminAuth";
+import { findTeamMemberByEmail, verifyPassword } from "@/lib/security/teamStore";
 
 // Deprecated/compromised passwords that must always be rejected immediately
 const COMPROMISED_PASSWORDS = new Set([
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const rawEmail = sanitizeString(body?.email, 254);
     const password = String(body?.password || "");
+    const requestedRole = body?.role ? String(body.role).trim().toLowerCase() : null;
 
     const { isValid, sanitized: email } = validateEmail(rawEmail);
     if (!isValid || !password) {
@@ -148,6 +150,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 5b. Team Store Managed Staff Check (Admin & Sub-Admin members added by Super Admin)
+    if (!authUser || !authRole) {
+      const teamMember = findTeamMemberByEmail(email);
+      if (teamMember && teamMember.is_active) {
+        const isMatch = verifyPassword(password, teamMember.passwordHash, teamMember.salt);
+        if (isMatch) {
+          authUser = {
+            id: teamMember.id,
+            email: teamMember.email,
+          };
+          authRole = teamMember.role as AdminRole;
+          adminName = teamMember.name;
+        }
+      }
+    }
+
     // 6. If neither Supabase Auth nor server-configured identity validated, reject credentials
     if (!authUser || !authRole) {
       return NextResponse.json(
@@ -164,10 +182,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Role Match Enforcement (Super Admin vs Admin vs Sub-Admin)
+    if (requestedRole) {
+      const normalizeRole = (r: string) => {
+        if (r === "owner" || r === "super_admin") return "super_admin";
+        if (r === "sub_admin" || r === "staff" || r === "delivery") return "sub_admin";
+        return "admin";
+      };
+
+      const normRequested = normalizeRole(requestedRole);
+      const normActual = normalizeRole(authRole);
+
+      if (normRequested !== normActual) {
+        const roleDisplayNames: Record<string, string> = {
+          super_admin: "Super Admin",
+          admin: "Admin",
+          sub_admin: "Sub-Admin",
+        };
+        const selectedLabel = roleDisplayNames[normRequested] || "Super Admin";
+        const article = normRequested === "admin" ? "an" : "a";
+        return NextResponse.json(
+          {
+            success: false,
+            error: `You are not registered as ${article} ${selectedLabel}. Please try your eligible role.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    const normalizedRole =
+      authRole === "owner" ? "super_admin" : authRole === "staff" ? "sub_admin" : "admin";
+
     const sessionPayload = {
       id: authUser.id,
       email: authUser.email || email,
       role: authRole,
+      roleType: normalizedRole,
       name: adminName,
     };
 

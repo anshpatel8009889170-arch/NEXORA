@@ -15,12 +15,16 @@ import {
   EyeOff,
   ChefHat,
   ShieldAlert,
+  Crown,
+  UserCog,
+  Bike,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 export default function AdminLoginPage() {
   const router = useRouter();
 
+  const [selectedRole, setSelectedRole] = useState<"super_admin" | "admin" | "sub_admin">("super_admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,11 +46,11 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      // 1. Authenticate via secure server API with rate limiting and HTTP-Only session cookies
+      // 1. Authenticate via secure server API with role verification, rate limiting, and HTTP-Only session cookies
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, password }),
+        body: JSON.stringify({ email: trimmedEmail, password, role: selectedRole }),
       });
 
       const data = await res.json();
@@ -57,7 +61,10 @@ export default function AdminLoginPage() {
 
       if (typeof window !== "undefined") {
         localStorage.setItem("nexora_admin_user", JSON.stringify(data.user));
-        localStorage.setItem("nexora_admin_role", data.user.role || "admin");
+        localStorage.setItem(
+          "nexora_admin_role",
+          data.user.roleType || (data.user.role === "owner" ? "super_admin" : data.user.role === "staff" ? "sub_admin" : "admin")
+        );
       }
 
       setSuccessMessage("Admin authentication verified! Accessing dashboard...");
@@ -115,6 +122,62 @@ export default function AdminLoginPage() {
 
           {/* Form matching user specification */}
           <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
+            {/* 3-WAY ROLE SELECTOR (Super Admin vs Admin vs Sub-Admin) */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-sub)]">
+                Select Portal Role
+              </label>
+              <div className="grid grid-cols-3 p-1 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRole("super_admin");
+                    setErrorMessage(null);
+                  }}
+                  className={`py-2 px-1 rounded-xl text-xs font-semibold tracking-wider transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    selectedRole === "super_admin"
+                      ? "bg-gold-gradient text-black shadow-md font-bold"
+                      : "text-[var(--text-sub)] hover:text-[var(--text-main)]"
+                  }`}
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  <span className="text-[10px] sm:text-[11px]">Super Admin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRole("admin");
+                    setErrorMessage(null);
+                  }}
+                  className={`py-2 px-1 rounded-xl text-xs font-semibold tracking-wider transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    selectedRole === "admin"
+                      ? "bg-gold-gradient text-black shadow-md font-bold"
+                      : "text-[var(--text-sub)] hover:text-[var(--text-main)]"
+                  }`}
+                >
+                  <UserCog className="w-3.5 h-3.5" />
+                  <span className="text-[10px] sm:text-[11px]">Admin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRole("sub_admin");
+                    setErrorMessage(null);
+                  }}
+                  className={`py-2 px-1 rounded-xl text-xs font-semibold tracking-wider transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    selectedRole === "sub_admin"
+                      ? "bg-gold-gradient text-black shadow-md font-bold"
+                      : "text-[var(--text-sub)] hover:text-[var(--text-main)]"
+                  }`}
+                >
+                  <Bike className="w-3.5 h-3.5" />
+                  <span className="text-[10px] sm:text-[11px]">Sub-Admin</span>
+                </button>
+              </div>
+            </div>
+
             {/* Email Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">

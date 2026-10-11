@@ -28,6 +28,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Bike,
+  Crown,
+  UserCog,
   Phone,
   MapPin,
   Flame,
@@ -68,6 +70,7 @@ type AdminTab =
   | "orders"
   | "menu"
   | "categories"
+  | "team"
   | "customers"
   | "offers"
   | "tables"
@@ -282,6 +285,42 @@ export default function AdminDashboardPage() {
   const [analyticsData, setAnalyticsData] = useState(defaultAdminAnalytics);
   const [analyticsTimeframe, setAnalyticsTimeframe] = useState<"today" | "weekly" | "monthly" | "all">("today");
 
+  // Team Management State (Phase 30: Super Admin Role-Based Access Control)
+  const [teamMembers, setTeamMembers] = useState<any[]>([
+    {
+      id: "tm_admin_manager_1",
+      name: "Vikram Singh (Manager)",
+      email: "manager@nexora.com",
+      role: "admin",
+      roleType: "admin",
+      created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+      is_active: true,
+    },
+    {
+      id: "tm_delivery_staff_1",
+      name: "Ramesh Kumar (Delivery)",
+      email: "delivery@nexora.com",
+      role: "staff",
+      roleType: "sub_admin",
+      created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+      is_active: true,
+    },
+  ]);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isSavingTeamMember, setIsSavingTeamMember] = useState(false);
+  const [teamForm, setTeamForm] = useState<{
+    name: string;
+    email: string;
+    password: string;
+    role: "admin" | "sub_admin";
+  }>({
+    name: "",
+    email: "",
+    password: "",
+    role: "admin",
+  });
+  const [teamFeedback, setTeamFeedback] = useState<string | null>(null);
+
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -291,6 +330,13 @@ export default function AdminDashboardPage() {
           const parsed = JSON.parse(stored);
           setAdminUser(parsed);
           setIsLoading(false);
+
+          // Role-based active tab default
+          const storedRole = localStorage.getItem("nexora_admin_role");
+          const r = (storedRole || parsed?.role || "super_admin").toLowerCase();
+          if (r === "admin" || r === "staff" || r === "sub_admin" || r === "delivery") {
+            setActiveTab("orders");
+          }
         } catch {}
       } else {
         // Not authenticated -> redirect to /admin/login
@@ -1011,6 +1057,89 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Team Management Handlers (Phase 30)
+  const handleAddTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamForm.name.trim() || !teamForm.email.trim() || !teamForm.password.trim()) return;
+
+    setIsSavingTeamMember(true);
+    setTeamFeedback(null);
+
+    try {
+      const res = await fetch("/api/admin/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teamForm),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to add team member.");
+      }
+
+      setTeamMembers((prev) => [data.member, ...prev.filter((m) => m.id !== data.member.id)]);
+      setIsTeamModalOpen(false);
+      setTeamForm({ name: "", email: "", password: "", role: "admin" });
+      setTeamFeedback(data.message || "Team member added successfully!");
+      setTimeout(() => setTeamFeedback(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to add team member.");
+    } finally {
+      setIsSavingTeamMember(false);
+    }
+  };
+
+  const handleDeleteTeamMember = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove team member "${name}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/team?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+        setTeamFeedback(`Member "${name}" removed successfully.`);
+        setTimeout(() => setTeamFeedback(null), 4000);
+      }
+    } catch (err) {
+      console.warn("Delete team member error:", err);
+    }
+  };
+
+  // Sync team members from /api/admin/team
+  useEffect(() => {
+    const r = (adminUser?.role || (typeof window !== "undefined" ? localStorage.getItem("nexora_admin_role") : null) || "").toLowerCase();
+    const isOwner = r === "owner" || r === "super_admin";
+    if (isOwner) {
+      fetch("/api/admin/team")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.team)) {
+            setTeamMembers(data.team);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [adminUser]);
+
+  const currentRole = (
+    adminUser?.role ||
+    (typeof window !== "undefined" ? localStorage.getItem("nexora_admin_role") : null) ||
+    "owner"
+  ).toLowerCase();
+
+  const isSuperAdmin = currentRole === "owner" || currentRole === "super_admin";
+  const isAdmin = currentRole === "admin";
+  const isSubAdmin = currentRole === "staff" || currentRole === "sub_admin" || currentRole === "delivery";
+
+  // Tab View Guard: Ensure Admins and Sub-Admins cannot access unauthorized views
+  useEffect(() => {
+    if (isAdmin && !["orders", "menu", "categories"].includes(activeTab)) {
+      setActiveTab("orders");
+    } else if (isSubAdmin && activeTab !== "orders") {
+      setActiveTab("orders");
+    }
+  }, [isAdmin, isSubAdmin, activeTab]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center text-[#d4af37] text-sm">
@@ -1019,19 +1148,37 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Sidebar Items Matching User Specification Exactly
-  const sidebarItems: { id: AdminTab; label: string; icon: any }[] = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "orders", label: "Orders", icon: ShoppingBag },
-    { id: "menu", label: "Menu", icon: UtensilsCrossed },
-    { id: "categories", label: "Categories", icon: FolderTree },
-    { id: "customers", label: "Customers", icon: Users },
-    { id: "offers", label: "Offers", icon: Tag },
-    { id: "tables", label: "Tables", icon: Armchair },
-    { id: "reviews", label: "Reviews", icon: Star },
-    { id: "analytics", label: "Analytics", icon: BarChart3 },
-    { id: "settings", label: "Settings", icon: Settings },
-  ];
+  // Sidebar Items Matching Role Permissions Exactly
+  let sidebarItems: { id: AdminTab; label: string; icon: any }[] = [];
+
+  if (isSubAdmin) {
+    // Sub-Admin (Delivery Boy): Orders only
+    sidebarItems = [
+      { id: "orders", label: "Deliveries", icon: Bike },
+    ];
+  } else if (isAdmin) {
+    // Admin (Operations): Orders, Menu, Categories only
+    sidebarItems = [
+      { id: "orders", label: "Live Orders", icon: ShoppingBag },
+      { id: "menu", label: "Menu Items", icon: UtensilsCrossed },
+      { id: "categories", label: "Categories", icon: FolderTree },
+    ];
+  } else {
+    // Super Admin (Owner): Complete Full Access + Team Management
+    sidebarItems = [
+      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { id: "orders", label: "Orders", icon: ShoppingBag },
+      { id: "menu", label: "Menu", icon: UtensilsCrossed },
+      { id: "categories", label: "Categories", icon: FolderTree },
+      { id: "team", label: "Team & Staff", icon: Users },
+      { id: "customers", label: "Customers", icon: Users },
+      { id: "offers", label: "Offers", icon: Tag },
+      { id: "tables", label: "Tables", icon: Armchair },
+      { id: "reviews", label: "Reviews", icon: Star },
+      { id: "analytics", label: "Analytics", icon: BarChart3 },
+      { id: "settings", label: "Settings", icon: Settings },
+    ];
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col selection:bg-[#d4af37]/30 selection:text-white">
@@ -1056,9 +1203,22 @@ export default function AdminDashboardPage() {
 
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-[var(--text-main)]">
-                {adminUser?.name || "NEXORA Admin"}
-              </p>
+              <div className="flex items-center gap-1.5 justify-end">
+                <p className="text-xs font-semibold text-[var(--text-main)]">
+                  {adminUser?.name || "NEXORA Admin"}
+                </p>
+                <span
+                  className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+                    isSuperAdmin
+                      ? "bg-[#d4af37]/20 text-[#d4af37] border-[#d4af37]/40"
+                      : isAdmin
+                      ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
+                      : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                  }`}
+                >
+                  {isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "Sub-Admin"}
+                </span>
+              </div>
               <p className="text-[10px] text-[var(--text-sub)] font-mono">
                 {adminUser?.email || "nexora67@gmail.com"}
               </p>
@@ -2085,6 +2245,138 @@ export default function AdminDashboardPage() {
                       </div>
                     );
                   })}
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================================
+              TAB: TEAM & STAFF ROLES (SUPER ADMIN ONLY)
+              ========================================================== */}
+          {activeTab === "team" && isSuperAdmin && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Header with Title and Add Member Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
+                      Role-Based Access Control
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30">
+                      Super Admin Supreme
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-serif font-bold text-[var(--text-main)] pt-1">
+                    Team & Staff Management
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Create and manage authorized accounts for Operations Admins and Delivery Boys.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTeamModalOpen(true)}
+                  className="px-5 py-3 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add New Member</span>
+                </button>
+              </div>
+
+              {teamFeedback && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{teamFeedback}</span>
+                </div>
+              )}
+
+              {/* Members Grid / Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. Super Admin Card (Permanent) */}
+                <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-md space-y-4 relative overflow-hidden">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 border border-[#d4af37] flex items-center justify-center text-[#d4af37]">
+                        <Crown className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-[var(--text-main)]">
+                          {adminUser?.name || "Vaibhav Patel (Owner)"}
+                        </h3>
+                        <p className="text-xs font-mono text-[var(--text-sub)]">
+                          {adminUser?.email || "nexora67@gmail.com"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)] text-xs">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30">
+                      Super Admin (Owner)
+                    </span>
+                    <span className="text-[11px] text-emerald-400 font-medium">Permanent</span>
+                  </div>
+                </div>
+
+                {/* Team Members List */}
+                {teamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md space-y-4 hover:border-[#d4af37]/30 transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                            member.roleType === "sub_admin" || member.role === "staff"
+                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                              : "bg-blue-500/15 border-blue-500/30 text-blue-400"
+                          }`}
+                        >
+                          {member.roleType === "sub_admin" || member.role === "staff" ? (
+                            <Bike className="w-5 h-5" />
+                          ) : (
+                            <UserCog className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-main)]">
+                            {member.name}
+                          </h3>
+                          <p className="text-xs font-mono text-[var(--text-sub)]">
+                            {member.email}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTeamMember(member.id, member.name)}
+                        className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all cursor-pointer"
+                        title="Remove member"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)] text-xs">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          member.roleType === "sub_admin" || member.role === "staff"
+                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                            : "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                        }`}
+                      >
+                        {member.roleType === "sub_admin" || member.role === "staff"
+                          ? "Sub-Admin (Delivery)"
+                          : "Admin (Operations)"}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-sub-light)]">
+                        {member.created_at ? new Date(member.created_at).toLocaleDateString() : "Active"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -4088,6 +4380,119 @@ export default function AdminDashboardPage() {
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
                   <span>[ SAVE OFFER ]</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD TEAM MEMBER */}
+      {isTeamModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-md w-full rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--card-border)]">
+              <div>
+                <h3 className="text-lg font-serif font-bold text-[var(--text-main)]">
+                  Add Team Member
+                </h3>
+                <p className="text-xs text-[var(--text-sub)]">
+                  Create new Admin or Sub-Admin access.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTeamModalOpen(false)}
+                className="text-[var(--text-sub)] hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTeamMember} className="space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">
+                  Role
+                </label>
+                <select
+                  value={teamForm.role}
+                  onChange={(e) =>
+                    setTeamForm((prev) => ({
+                      ...prev,
+                      role: e.target.value as "admin" | "sub_admin",
+                    }))
+                  }
+                  className="w-full text-xs px-3.5 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+                >
+                  <option value="admin">👔 Admin (Menu, Categories & Orders)</option>
+                  <option value="sub_admin">🛵 Sub-Admin (Delivery Partner - Orders only)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={teamForm.name}
+                  onChange={(e) => setTeamForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Ramesh Kumar"
+                  className="w-full text-xs px-3.5 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">
+                  Login Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={teamForm.email}
+                  onChange={(e) => setTeamForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="e.g. delivery@nexora.com"
+                  className="w-full text-xs px-3.5 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">
+                  Password (min 8 chars)
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={teamForm.password}
+                  onChange={(e) => setTeamForm((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••"
+                  className="w-full text-xs px-3.5 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--card-border)]">
+                <button
+                  type="button"
+                  onClick={() => setIsTeamModalOpen(false)}
+                  className="px-4 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingTeamMember}
+                  className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSavingTeamMember ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Create Member</span>
+                  )}
                 </button>
               </div>
             </form>
