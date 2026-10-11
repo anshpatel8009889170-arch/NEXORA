@@ -5,12 +5,14 @@ import {
   getAllTeamMembers,
   addTeamMember,
   deleteTeamMember,
-  StoredTeamMember,
+  updateTeamMemberPassword,
+  isRootOwnerAccount,
+  ROOT_OWNER_EMAIL,
 } from "@/lib/security/teamStore";
 
 /**
  * GET /api/admin/team
- * Super Admin only: List all restaurant Admin and Sub-Admin (Delivery) members.
+ * Super Admin only: List all restaurant Super Admin, Admin, and Sub-Admin (Delivery) members.
  */
 export async function GET(req: NextRequest) {
   const adminCheck = await requireAdmin(req, ["owner"]);
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/team
- * Super Admin only: Add a new Admin (Manager) or Sub-Admin (Delivery) member.
+ * Super Admin only: Add a new Super Admin, Admin (Manager), or Sub-Admin (Delivery) member.
  */
 export async function POST(req: NextRequest) {
   const adminCheck = await requireAdmin(req, ["owner"]);
@@ -61,6 +63,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (isRootOwnerAccount(emailCheck.sanitized)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Action Forbidden: The Root Super Admin account is permanently reserved and cannot be created or altered.",
+        },
+        { status: 403 }
+      );
+    }
+
     if (rawPassword.length < 8) {
       return NextResponse.json(
         { success: false, error: "Password must be at least 8 characters long." },
@@ -68,8 +80,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const roleType: "admin" | "sub_admin" =
-      rawRole === "sub_admin" || rawRole === "staff" || rawRole === "delivery" ? "sub_admin" : "admin";
+    const roleType: "super_admin" | "admin" | "sub_admin" =
+      rawRole === "super_admin" || rawRole === "owner"
+        ? "super_admin"
+        : rawRole === "sub_admin" || rawRole === "staff" || rawRole === "delivery"
+        ? "sub_admin"
+        : "admin";
 
     const newMember = await addTeamMember({
       name: rawName,
@@ -80,9 +96,15 @@ export async function POST(req: NextRequest) {
 
     const { passwordHash, salt, ...safeMember } = newMember;
 
+    const roleLabels = {
+      super_admin: "Super Admin",
+      admin: "Admin (Operations)",
+      sub_admin: "Sub-Admin (Delivery)",
+    };
+
     return NextResponse.json({
       success: true,
-      message: `${roleType === "admin" ? "Admin (Manager)" : "Sub-Admin (Delivery)"} added successfully!`,
+      message: `${roleLabels[roleType]} added successfully!`,
       member: safeMember,
     });
   } catch (err: any) {
@@ -94,8 +116,68 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * PATCH /api/admin/team
+ * Super Admin only: Change or reset password of a staff or secondary admin member.
+ */
+export async function PATCH(req: NextRequest) {
+  const adminCheck = await requireAdmin(req, ["owner"]);
+  if (!adminCheck.authorized) {
+    return adminCheck.response;
+  }
+
+  try {
+    const body = await req.json();
+    const memberId = String(body?.id || "").trim();
+    const newPassword = String(body?.password || "").trim();
+
+    if (!memberId) {
+      return NextResponse.json(
+        { success: false, error: "Member ID is required to reset password." },
+        { status: 400 }
+      );
+    }
+
+    if (isRootOwnerAccount(memberId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Action Forbidden: The Root Super Admin password cannot be altered from the team portal.",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (newPassword.length < 8) {
+      return NextResponse.json(
+        { success: false, error: "New password must be at least 8 characters long." },
+        { status: 400 }
+      );
+    }
+
+    const result = await updateTeamMemberPassword(memberId, newPassword);
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error || "Failed to update password." },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Password for ${result.member?.name || "member"} has been reset successfully.`,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err?.message || "Failed to update member password." },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * DELETE /api/admin/team?id=...
  * Super Admin only: Remove a team member.
+ * Protects Root Super Admin from deletion.
  */
 export async function DELETE(req: NextRequest) {
   const adminCheck = await requireAdmin(req, ["owner"]);
@@ -108,6 +190,17 @@ export async function DELETE(req: NextRequest) {
 
   if (!memberId) {
     return NextResponse.json({ success: false, error: "Member ID is required." }, { status: 400 });
+  }
+
+  // Prevent any deletion of Root Super Admin
+  if (isRootOwnerAccount(memberId)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Action Forbidden: The Root Super Admin (Primary Owner) is permanently protected and cannot be deleted.",
+      },
+      { status: 403 }
+    );
   }
 
   try {

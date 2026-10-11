@@ -59,6 +59,8 @@ import {
   Calendar,
   CreditCard,
   Receipt,
+  Key,
+  Lock,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import { OrderStatus, MenuItem, Category, Offer, RestaurantSettings, Review } from "@/types/database";
@@ -312,7 +314,7 @@ export default function AdminDashboardPage() {
     name: string;
     email: string;
     password: string;
-    role: "admin" | "sub_admin";
+    role: "super_admin" | "admin" | "sub_admin";
   }>({
     name: "",
     email: "",
@@ -320,6 +322,9 @@ export default function AdminDashboardPage() {
     role: "admin",
   });
   const [teamFeedback, setTeamFeedback] = useState<string | null>(null);
+  const [passwordModalMember, setPasswordModalMember] = useState<{ id: string; name: string } | null>(null);
+  const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
@@ -1099,9 +1104,42 @@ export default function AdminDashboardPage() {
         setTeamMembers((prev) => prev.filter((m) => m.id !== id));
         setTeamFeedback(`Member "${name}" removed successfully.`);
         setTimeout(() => setTeamFeedback(null), 4000);
+      } else {
+        alert(data.error || "Failed to remove member.");
       }
     } catch (err) {
       console.warn("Delete team member error:", err);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalMember || newPasswordValue.length < 8) {
+      alert("Password must be at least 8 characters long.");
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      const res = await fetch("/api/admin/team", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: passwordModalMember.id,
+          password: newPasswordValue,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update password.");
+      }
+      setTeamFeedback(`Password for "${passwordModalMember.name}" has been updated successfully!`);
+      setPasswordModalMember(null);
+      setNewPasswordValue("");
+      setTimeout(() => setTeamFeedback(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to update password.");
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -2292,91 +2330,129 @@ export default function AdminDashboardPage() {
 
               {/* Members Grid / Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* 1. Super Admin Card (Permanent) */}
-                <div className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[#d4af37]/40 shadow-md space-y-4 relative overflow-hidden">
+                {/* 1. Root Super Admin Card (Protected & Permanent) */}
+                <div className="p-5 rounded-2xl bg-[var(--card-bg)] border-2 border-[#d4af37]/60 shadow-lg space-y-4 relative overflow-hidden gold-glow-sm">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#d4af37]/20 border border-[#d4af37] flex items-center justify-center text-[#d4af37]">
+                      <div className="w-10 h-10 rounded-xl bg-gold-gradient text-black flex items-center justify-center font-bold shadow-md">
                         <Crown className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-[var(--text-main)]">
-                          {adminUser?.name || "Vaibhav Patel (Owner)"}
-                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="text-sm font-bold text-[var(--text-main)]">
+                            {adminUser?.name || "Vaibhav Patel (Owner)"}
+                          </h3>
+                        </div>
                         <p className="text-xs font-mono text-[var(--text-sub)]">
                           {adminUser?.email || "nexora67@gmail.com"}
                         </p>
                       </div>
                     </div>
+
+                    <div className="flex items-center gap-1 text-[10px] text-[#d4af37] font-semibold bg-[#d4af37]/10 border border-[#d4af37]/30 px-2 py-1 rounded-lg">
+                      <Lock className="w-3 h-3" />
+                      <span>Protected</span>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)] text-xs">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30">
-                      Super Admin (Owner)
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gold-gradient text-black font-mono">
+                      Root Super Admin (Owner)
                     </span>
-                    <span className="text-[11px] text-emerald-400 font-medium">Permanent</span>
+                    <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Permanent
+                    </span>
                   </div>
                 </div>
 
-                {/* Team Members List */}
-                {teamMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md space-y-4 hover:border-[#d4af37]/30 transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
-                            member.roleType === "sub_admin" || member.role === "staff"
-                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                              : "bg-blue-500/15 border-blue-500/30 text-blue-400"
-                          }`}
-                        >
-                          {member.roleType === "sub_admin" || member.role === "staff" ? (
-                            <Bike className="w-5 h-5" />
-                          ) : (
-                            <UserCog className="w-5 h-5" />
-                          )}
+                {/* Team Members List (Secondary Super Admins, Admins, Sub-Admins) */}
+                {teamMembers.map((member) => {
+                  const isMemSuperAdmin = member.roleType === "super_admin" || member.role === "owner";
+                  const isMemSubAdmin = member.roleType === "sub_admin" || member.role === "staff";
+
+                  return (
+                    <div
+                      key={member.id}
+                      className="p-5 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md space-y-4 hover:border-[#d4af37]/30 transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                              isMemSuperAdmin
+                                ? "bg-[#d4af37]/15 border-[#d4af37]/40 text-[#d4af37]"
+                                : isMemSubAdmin
+                                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                                : "bg-blue-500/15 border-blue-500/30 text-blue-400"
+                            }`}
+                          >
+                            {isMemSuperAdmin ? (
+                              <Crown className="w-5 h-5" />
+                            ) : isMemSubAdmin ? (
+                              <Bike className="w-5 h-5" />
+                            ) : (
+                              <UserCog className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-[var(--text-main)]">
+                              {member.name}
+                            </h3>
+                            <p className="text-xs font-mono text-[var(--text-sub)]">
+                              {member.email}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-[var(--text-main)]">
-                            {member.name}
-                          </h3>
-                          <p className="text-xs font-mono text-[var(--text-sub)]">
-                            {member.email}
-                          </p>
+
+                        {/* Actions: Change Password & Delete Member */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPasswordModalMember({ id: member.id, name: member.name });
+                              setNewPasswordValue("");
+                            }}
+                            className="p-1.5 rounded-lg text-[var(--text-sub)] hover:text-[#d4af37] hover:bg-[#d4af37]/10 transition-all cursor-pointer"
+                            title="Change Password"
+                          >
+                            <Key className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTeamMember(member.id, member.name)}
+                            className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all cursor-pointer"
+                            title="Remove member"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTeamMember(member.id, member.name)}
-                        className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all cursor-pointer"
-                        title="Remove member"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)] text-xs">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                            isMemSuperAdmin
+                              ? "bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30"
+                              : isMemSubAdmin
+                              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                              : "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                          }`}
+                        >
+                          {isMemSuperAdmin
+                            ? "Super Admin"
+                            : isMemSubAdmin
+                            ? "Sub-Admin (Delivery)"
+                            : "Admin (Operations)"}
+                        </span>
+                        <span className="text-[10px] text-[var(--text-sub-light)]">
+                          {member.created_at ? new Date(member.created_at).toLocaleDateString() : "Active"}
+                        </span>
+                      </div>
                     </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)] text-xs">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                          member.roleType === "sub_admin" || member.role === "staff"
-                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                            : "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                        }`}
-                      >
-                        {member.roleType === "sub_admin" || member.role === "staff"
-                          ? "Sub-Admin (Delivery)"
-                          : "Admin (Operations)"}
-                      </span>
-                      <span className="text-[10px] text-[var(--text-sub-light)]">
-                        {member.created_at ? new Date(member.created_at).toLocaleDateString() : "Active"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -4419,12 +4495,13 @@ export default function AdminDashboardPage() {
                   onChange={(e) =>
                     setTeamForm((prev) => ({
                       ...prev,
-                      role: e.target.value as "admin" | "sub_admin",
+                      role: e.target.value as "super_admin" | "admin" | "sub_admin",
                     }))
                   }
                   className="w-full text-xs px-3.5 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
                 >
-                  <option value="admin">👔 Admin (Menu, Categories & Orders)</option>
+                  <option value="super_admin">👑 Super Admin (Full Restaurant &amp; Team Access)</option>
+                  <option value="admin">👔 Admin (Menu, Categories &amp; Orders)</option>
                   <option value="sub_admin">🛵 Sub-Admin (Delivery Partner - Orders only)</option>
                 </select>
               </div>
@@ -4492,6 +4569,74 @@ export default function AdminDashboardPage() {
                     </>
                   ) : (
                     <span>Create Member</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RESET / CHANGE PASSWORD FOR TEAM MEMBER */}
+      {passwordModalMember && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-md w-full rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/40 p-6 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 gold-glow-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--card-border)]">
+              <div>
+                <h3 className="text-lg font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                  <Key className="w-4 h-4 text-[#d4af37]" />
+                  <span>Reset Password</span>
+                </h3>
+                <p className="text-xs text-[var(--text-sub)]">
+                  Set a new password for <span className="font-semibold text-[var(--text-main)]">{passwordModalMember.name}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPasswordModalMember(null)}
+                className="text-[var(--text-sub)] hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePassword} className="space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">
+                  New Password (min 8 characters)
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newPasswordValue}
+                  onChange={(e) => setNewPasswordValue(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full text-xs px-3.5 py-3 rounded-xl bg-[var(--section-alt)] border border-[var(--card-border)] text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none focus:border-[#d4af37]"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--card-border)]">
+                <button
+                  type="button"
+                  onClick={() => setPasswordModalMember(null)}
+                  className="px-4 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider text-[var(--text-sub)] hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingPassword}
+                  className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 disabled:opacity-40 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  {isUpdatingPassword ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <span>Update Password</span>
                   )}
                 </button>
               </div>
