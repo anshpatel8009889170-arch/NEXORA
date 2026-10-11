@@ -63,25 +63,27 @@ export async function GET(request: NextRequest) {
     const rateLimitRes = enforceRateLimit(request, "get_offers", { limit: 120, windowMs: 60 * 1000 });
     if (rateLimitRes) return rateLimitRes;
 
+    const isDemo = request.nextUrl.searchParams.get("demo") === "true";
+    if (isDemo && process.env.NODE_ENV !== "production") {
+      return NextResponse.json({ success: true, offers: DEFAULT_OFFERS, isDemo: true });
+    }
+
     const supabase = createServerClient();
     const { data: dbOffers, error } = await supabase
       .from("offers")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error && dbOffers && dbOffers.length > 0) {
-      // Ensure key standard promo offers (like SAVE50) are present if not yet saved in DB
-      const existingCodes = new Set(dbOffers.map((o: any) => o.code?.toUpperCase()));
-      const missingDefaults = DEFAULT_OFFERS.filter(
-        (def) => !existingCodes.has(def.code.toUpperCase())
-      );
-      return NextResponse.json({ success: true, offers: [...dbOffers, ...missingDefaults] });
+    if (!error && Array.isArray(dbOffers)) {
+      return NextResponse.json({ success: true, offers: dbOffers });
     }
 
-    return NextResponse.json({ success: true, offers: DEFAULT_OFFERS });
+    // Local offline runtime fallback
+    const runtimeOffers = getRuntimeOffers();
+    return NextResponse.json({ success: true, offers: runtimeOffers });
   } catch (error: any) {
     console.error("GET /api/offers error:", error);
-    return NextResponse.json({ success: true, offers: DEFAULT_OFFERS });
+    return NextResponse.json({ success: true, offers: [] });
   }
 }
 

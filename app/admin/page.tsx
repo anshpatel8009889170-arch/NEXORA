@@ -97,100 +97,9 @@ interface AdminOrder {
   address: string;
 }
 
-const initialAdminOffers: Offer[] = [
-  {
-    id: "offer_save50",
-    code: "SAVE50",
-    description: "Special 20% discount on gourmet fine-dining orders above ₹499 (Max ₹150)",
-    discount_type: "percentage",
-    discount_value: 20,
-    minimum_order: 499,
-    max_discount: 150,
-    is_active: true,
-    created_at: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "offer_welcome50",
-    code: "WELCOME50",
-    description: "Flat ₹50 savings on your royal order above ₹299",
-    discount_type: "flat",
-    discount_value: 50,
-    minimum_order: 299,
-    max_discount: null,
-    is_active: true,
-    created_at: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "offer_royal100",
-    code: "ROYAL100",
-    description: "Flat ₹100 savings on royal dining and party orders above ₹599",
-    discount_type: "flat",
-    discount_value: 100,
-    minimum_order: 599,
-    max_discount: null,
-    is_active: true,
-    created_at: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "offer_festive20",
-    code: "FESTIVE20",
-    description: "Festive celebration 20% discount up to ₹200 on luxury orders above ₹499",
-    discount_type: "percentage",
-    discount_value: 20,
-    minimum_order: 499,
-    max_discount: 200,
-    is_active: true,
-    created_at: "2026-01-01T00:00:00.000Z",
-  },
-];
+const initialAdminOffers: Offer[] = [];
 
-const initialAdminReviews: Review[] = [
-  {
-    id: "rev_1",
-    customer_name: "Aanya Singhania",
-    dish_name: "24K Gold Saffron Shahi Tukda",
-    rating: 5,
-    comment: "Finest dessert in North India. Truly authentic royal gastronomy.",
-    is_approved: true,
-    created_at: "2026-10-09T18:30:00.000Z",
-  },
-  {
-    id: "rev_2",
-    customer_name: "Rohit Verma",
-    dish_name: "Burrata & Truffle Funghi Pizza",
-    rating: 5,
-    comment: "Thermal express delivery arrived steaming hot. Sourdough crust is world-class.",
-    is_approved: true,
-    created_at: "2026-10-09T19:15:00.000Z",
-  },
-  {
-    id: "rev_3",
-    customer_name: "Vikram Malhotra",
-    dish_name: "Truffle Malai Chaap",
-    rating: 5,
-    comment: "The clay oven smoked aroma and cashew marinade was absolutely exquisite. Grand royal dining!",
-    is_approved: true,
-    created_at: "2026-10-09T20:00:00.000Z",
-  },
-  {
-    id: "rev_4",
-    customer_name: "Pooja Sharma",
-    dish_name: "Dal Bukhara Grand Cru",
-    rating: 5,
-    comment: "Slow-cooked for 24 hours. Incredible depth of flavor and velvety richness.",
-    is_approved: true,
-    created_at: "2026-10-09T20:45:00.000Z",
-  },
-  {
-    id: "rev_5",
-    customer_name: "Aditya Saxena",
-    dish_name: "Paneer Lababdar",
-    rating: 5,
-    comment: "Food was amazing. Truly extraordinary pure-veg culinary art.",
-    is_approved: false,
-    created_at: "2026-10-10T08:15:00.000Z",
-  },
-];
+const initialAdminReviews: Review[] = [];
 
 const defaultAdminSettings: RestaurantSettings = {
   id: "default",
@@ -214,70 +123,28 @@ const defaultAdminSettings: RestaurantSettings = {
 };
 
 const defaultAdminAnalytics = {
-  todaySales: 12450,
-  weeklySales: 84200,
-  monthlySales: 342800,
-  todayGrowth: 14.2,
-  weeklyGrowth: 8.6,
-  monthlyGrowth: 18.4,
-  totalOrdersToday: 48,
-  totalOrdersWeekly: 318,
-  totalOrdersMonthly: 1290,
-  averageOrderValue: 785,
-  deliveredCount: 38,
-  pendingCount: 6,
-  mostOrderedFood: [
-    {
-      rank: 1,
-      name: "Biryani",
-      category: "Awadhi Royal Dum Biryani",
-      count: 214,
-      revenue: 59920,
-      percentage: 34,
-    },
-    {
-      rank: 2,
-      name: "Paneer Tikka",
-      category: "Truffle Malai Charcoal Smoked",
-      count: 186,
-      revenue: 46314,
-      percentage: 29,
-    },
-    {
-      rank: 3,
-      name: "Butter Chicken",
-      category: "Rich Cashew Makhani (Pure Veg)",
-      count: 152,
-      revenue: 45448,
-      percentage: 24,
-    },
-    {
-      rank: 4,
-      name: "NEXORA Royal Dal Bukhara",
-      category: "24-Hour Clay Pot Slow Cooked",
-      count: 128,
-      revenue: 38400,
-      percentage: 20,
-    },
-    {
-      rank: 5,
-      name: "24K Gold Saffron Shahi Tukda",
-      category: "Royal Dessert Confectionery",
-      count: 94,
-      revenue: 35720,
-      percentage: 15,
-    },
-  ],
-  categories: [
-    { name: "Main Course", percentage: 42, amount: 143976 },
-    { name: "Starters", percentage: 28, amount: 95984 },
-    { name: "Woodfire Pizzas", percentage: 18, amount: 61704 },
-    { name: "Desserts & Drinks", percentage: 12, amount: 41136 },
-  ],
-  payments: [
-    { method: "Online (Razorpay / UPI)", percentage: 68, count: 877 },
-    { method: "Cash on Delivery (COD)", percentage: 32, count: 413 },
-  ],
+  todaySales: 0,
+  weeklySales: 0,
+  monthlySales: 0,
+  todayGrowth: 0,
+  weeklyGrowth: 0,
+  monthlyGrowth: 0,
+  totalOrdersToday: 0,
+  totalOrdersWeekly: 0,
+  totalOrdersMonthly: 0,
+  averageOrderValue: 0,
+  deliveredCount: 0,
+  pendingCount: 0,
+  mostOrderedFood: [] as {
+    rank: number;
+    name: string;
+    category: string;
+    count: number;
+    revenue: number;
+    percentage: number;
+  }[],
+  categories: [] as { name: string; percentage: number; amount: number }[],
+  payments: [] as { method: string; percentage: number; count: number }[],
 };
 
 export default function AdminDashboardPage() {
@@ -481,7 +348,7 @@ export default function AdminDashboardPage() {
           fetch("/api/offers")
             .then((res) => res.json())
             .then((json) => {
-              if (json.success && Array.isArray(json.offers) && json.offers.length > 0) {
+              if (json.success && Array.isArray(json.offers)) {
                 setOffersList(json.offers);
                 localStorage.setItem("nexora_admin_offers", JSON.stringify(json.offers));
               }
@@ -538,7 +405,7 @@ export default function AdminDashboardPage() {
           fetch("/api/reviews?all=true")
             .then((res) => res.json())
             .then((json) => {
-              if (json.success && Array.isArray(json.reviews) && json.reviews.length > 0) {
+              if (json.success && Array.isArray(json.reviews)) {
                 setReviewsList(json.reviews);
                 localStorage.setItem("nexora_admin_reviews", JSON.stringify(json.reviews));
               }
@@ -554,21 +421,21 @@ export default function AdminDashboardPage() {
           .then((json) => {
             if (json.success && json.analytics) {
               setAnalyticsData({
-                todaySales: json.analytics.sales?.today || defaultAdminAnalytics.todaySales,
-                weeklySales: json.analytics.sales?.weekly || defaultAdminAnalytics.weeklySales,
-                monthlySales: json.analytics.sales?.monthly || defaultAdminAnalytics.monthlySales,
-                todayGrowth: json.analytics.sales?.todayGrowth || defaultAdminAnalytics.todayGrowth,
-                weeklyGrowth: json.analytics.sales?.weeklyGrowth || defaultAdminAnalytics.weeklyGrowth,
-                monthlyGrowth: json.analytics.sales?.monthlyGrowth || defaultAdminAnalytics.monthlyGrowth,
-                totalOrdersToday: json.analytics.orders?.totalToday || defaultAdminAnalytics.totalOrdersToday,
-                totalOrdersWeekly: json.analytics.orders?.totalWeekly || defaultAdminAnalytics.totalOrdersWeekly,
-                totalOrdersMonthly: json.analytics.orders?.totalMonthly || defaultAdminAnalytics.totalOrdersMonthly,
-                averageOrderValue: json.analytics.orders?.averageOrderValue || defaultAdminAnalytics.averageOrderValue,
-                deliveredCount: json.analytics.orders?.deliveredCount || defaultAdminAnalytics.deliveredCount,
-                pendingCount: json.analytics.orders?.pendingCount || defaultAdminAnalytics.pendingCount,
-                mostOrderedFood: json.analytics.mostOrderedFood || defaultAdminAnalytics.mostOrderedFood,
-                categories: json.analytics.categoryBreakdown || defaultAdminAnalytics.categories,
-                payments: json.analytics.paymentBreakdown || defaultAdminAnalytics.payments,
+                todaySales: json.analytics.sales?.today ?? 0,
+                weeklySales: json.analytics.sales?.weekly ?? 0,
+                monthlySales: json.analytics.sales?.monthly ?? 0,
+                todayGrowth: json.analytics.sales?.todayGrowth ?? 0,
+                weeklyGrowth: json.analytics.sales?.weeklyGrowth ?? 0,
+                monthlyGrowth: json.analytics.sales?.monthlyGrowth ?? 0,
+                totalOrdersToday: json.analytics.orders?.totalToday ?? 0,
+                totalOrdersWeekly: json.analytics.orders?.totalWeekly ?? 0,
+                totalOrdersMonthly: json.analytics.orders?.totalMonthly ?? 0,
+                averageOrderValue: json.analytics.orders?.averageOrderValue ?? 0,
+                deliveredCount: json.analytics.orders?.deliveredCount ?? 0,
+                pendingCount: json.analytics.orders?.pendingCount ?? 0,
+                mostOrderedFood: json.analytics.mostOrderedFood ?? [],
+                categories: json.analytics.categoryBreakdown ?? [],
+                payments: json.analytics.paymentBreakdown ?? [],
               });
             }
           })
@@ -2906,89 +2773,96 @@ export default function AdminDashboardPage() {
                   </span>
                 </div>
 
-                {/* Top 3 Podium Highlights Specified by User */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* 1. Biryani */}
-                  <div className="p-5 rounded-2xl bg-[var(--section-alt)] border-2 border-[#d4af37] shadow-lg space-y-3 relative overflow-hidden gold-glow-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="w-8 h-8 rounded-full bg-gold-gradient text-black font-extrabold text-sm flex items-center justify-center shadow-md">
-                        1
-                      </span>
-                      <span className="text-xs font-bold text-[#d4af37] font-mono">
-                        214 Orders
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
-                        1. Biryani
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-sub)]">
-                        Awadhi Royal Dum Biryani
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
-                      <span className="text-[var(--text-sub)]">Gross Revenue</span>
-                      <span className="font-serif font-bold text-gold-gradient">₹59,920</span>
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-[#d4af37] h-full rounded-full w-[100%]" />
-                    </div>
+                {/* Top Podium Highlights Rendered from Real Order Analytics */}
+                {analyticsData.mostOrderedFood.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {analyticsData.mostOrderedFood.slice(0, 3).map((dish) => (
+                      <div
+                        key={dish.rank}
+                        className={`p-5 rounded-2xl bg-[var(--section-alt)] space-y-3 relative overflow-hidden shadow-md ${
+                          dish.rank === 1
+                            ? "border-2 border-[#d4af37] gold-glow-sm"
+                            : dish.rank === 2
+                            ? "border border-zinc-500/50"
+                            : "border border-amber-600/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`w-8 h-8 rounded-full font-extrabold text-sm flex items-center justify-center shadow-md ${
+                              dish.rank === 1
+                                ? "bg-gold-gradient text-black"
+                                : dish.rank === 2
+                                ? "bg-zinc-300 text-black"
+                                : "bg-amber-600 text-white"
+                            }`}
+                          >
+                            {dish.rank}
+                          </span>
+                          <span
+                            className={`text-xs font-bold font-mono ${
+                              dish.rank === 1
+                                ? "text-[#d4af37]"
+                                : dish.rank === 2
+                                ? "text-zinc-300"
+                                : "text-amber-400"
+                            }`}
+                          >
+                            {dish.count} {dish.count === 1 ? "Order" : "Orders"}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-serif font-bold text-[var(--text-main)] truncate">
+                            {dish.rank}. {dish.name}
+                          </h4>
+                          <p className="text-[11px] text-[var(--text-sub)] truncate">
+                            {dish.category}
+                          </p>
+                        </div>
+                        <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
+                          <span className="text-[var(--text-sub)]">Gross Revenue</span>
+                          <span
+                            className={`font-serif font-bold ${
+                              dish.rank === 1 ? "text-gold-gradient" : "text-[var(--text-main)]"
+                            }`}
+                          >
+                            {formatCurrency(dish.revenue)}
+                          </span>
+                        </div>
+                        <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              dish.rank === 1
+                                ? "bg-[#d4af37]"
+                                : dish.rank === 2
+                                ? "bg-zinc-400"
+                                : "bg-amber-600"
+                            }`}
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.round(
+                                  (dish.count /
+                                    (analyticsData.mostOrderedFood[0]?.count || 1)) *
+                                    100
+                                )
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  {/* 2. Paneer Tikka */}
-                  <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-zinc-500/50 shadow-md space-y-3 relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="w-8 h-8 rounded-full bg-zinc-300 text-black font-extrabold text-sm flex items-center justify-center shadow-sm">
-                        2
-                      </span>
-                      <span className="text-xs font-bold text-zinc-300 font-mono">
-                        186 Orders
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
-                        2. Paneer Tikka
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-sub)]">
-                        Truffle Malai Charcoal Smoked
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
-                      <span className="text-[var(--text-sub)]">Gross Revenue</span>
-                      <span className="font-serif font-bold text-zinc-200">₹46,314</span>
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-zinc-400 h-full rounded-full w-[87%]" />
-                    </div>
+                ) : (
+                  <div className="p-8 rounded-2xl bg-[var(--section-alt)] border border-[var(--card-border)] text-center space-y-2">
+                    <p className="text-sm font-serif font-bold text-[var(--text-main)]">
+                      No Dish Orders Recorded Yet
+                    </p>
+                    <p className="text-xs text-[var(--text-sub)] max-w-md mx-auto">
+                      Ranked top dishes and revenue analytics will automatically appear here once patrons begin placing orders.
+                    </p>
                   </div>
-
-                  {/* 3. Butter Chicken */}
-                  <div className="p-5 rounded-2xl bg-[var(--section-alt)] border border-amber-600/40 shadow-md space-y-3 relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="w-8 h-8 rounded-full bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center shadow-sm">
-                        3
-                      </span>
-                      <span className="text-xs font-bold text-amber-400 font-mono">
-                        152 Orders
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
-                        3. Butter Chicken
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-sub)]">
-                        Rich Cashew Makhani (Pure Veg Special)
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-xs">
-                      <span className="text-[var(--text-sub)]">Gross Revenue</span>
-                      <span className="font-serif font-bold text-amber-400">₹45,448</span>
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-amber-600 h-full rounded-full w-[71%]" />
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 {/* Full Leaderboard Rows */}
                 <div className="space-y-2.5 pt-2">
@@ -3047,22 +2921,26 @@ export default function AdminDashboardPage() {
                     <span>Category Revenue Share</span>
                   </h4>
                   <div className="space-y-3">
-                    {analyticsData.categories.map((cat, i) => (
-                      <div key={i} className="space-y-1 text-xs">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[var(--text-main)] font-medium">{cat.name}</span>
-                          <span className="text-[var(--text-sub)] font-mono">
-                            {cat.percentage}% ({formatCurrency(cat.amount)})
-                          </span>
+                    {analyticsData.categories.length > 0 ? (
+                      analyticsData.categories.map((cat, i) => (
+                        <div key={i} className="space-y-1 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[var(--text-main)] font-medium">{cat.name}</span>
+                            <span className="text-[var(--text-sub)] font-mono">
+                              {cat.percentage}% ({formatCurrency(cat.amount)})
+                            </span>
+                          </div>
+                          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-gold-gradient h-full rounded-full"
+                              style={{ width: `${cat.percentage}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="bg-gold-gradient h-full rounded-full"
-                            style={{ width: `${cat.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-xs text-[var(--text-sub)] italic">No category revenue data recorded yet.</p>
+                    )}
                   </div>
                 </div>
 
@@ -3074,22 +2952,26 @@ export default function AdminDashboardPage() {
                       <span>Payment Modes Breakdown</span>
                     </h4>
                     <div className="space-y-3">
-                      {analyticsData.payments.map((pm, i) => (
-                        <div key={i} className="space-y-1 text-xs">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[var(--text-main)] font-medium">{pm.method}</span>
-                            <span className="text-[var(--text-sub)] font-mono">
-                              {pm.percentage}% ({pm.count} orders)
-                            </span>
+                      {analyticsData.payments.length > 0 ? (
+                        analyticsData.payments.map((pm, i) => (
+                          <div key={i} className="space-y-1 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[var(--text-main)] font-medium">{pm.method}</span>
+                              <span className="text-[var(--text-sub)] font-mono">
+                                {pm.percentage}% ({pm.count} orders)
+                              </span>
+                            </div>
+                            <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-emerald-500 h-full rounded-full"
+                                style={{ width: `${pm.percentage}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="bg-emerald-500 h-full rounded-full"
-                              style={{ width: `${pm.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="text-xs text-[var(--text-sub)] italic">No payment transactions recorded yet.</p>
+                      )}
                     </div>
                   </div>
 

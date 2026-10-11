@@ -14,6 +14,12 @@ export async function GET(request: NextRequest) {
     });
     if (rateLimitRes) return rateLimitRes;
 
+    const isDemo = request.nextUrl.searchParams.get("demo") === "true";
+    if (isDemo && process.env.NODE_ENV !== "production") {
+      const activeDefaults = DEFAULT_OFFERS.filter((o) => o.is_active !== false);
+      return NextResponse.json({ success: true, offers: activeDefaults, isDemo: true });
+    }
+
     const supabase = createServerClient();
     const { data: dbOffers, error } = await supabase
       .from("offers")
@@ -21,17 +27,14 @@ export async function GET(request: NextRequest) {
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    if (!error && dbOffers && dbOffers.length > 0) {
+    if (!error && Array.isArray(dbOffers)) {
       return NextResponse.json({ success: true, offers: dbOffers });
     }
 
-    // Fallback: only active default offers
-    const activeDefaults = DEFAULT_OFFERS.filter((o) => o.is_active !== false);
-    return NextResponse.json({ success: true, offers: activeDefaults });
+    return NextResponse.json({ success: true, offers: [] });
   } catch (error: any) {
     console.warn("GET /api/public/offers fallback:", error?.message);
-    const activeDefaults = DEFAULT_OFFERS.filter((o) => o.is_active !== false);
-    return NextResponse.json({ success: true, offers: activeDefaults });
+    return NextResponse.json({ success: true, offers: [] });
   }
 }
 

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
-import { POST as submitReviewHandler } from "@/app/api/reviews/route";
+import { POST as submitReviewHandler, DEMO_BENCHMARK_REVIEWS } from "@/app/api/reviews/route";
 
 // GET /api/public/reviews
-// Returns ONLY approved reviews for public display
+// Returns ONLY authentic approved reviews for public display
 export async function GET(request: NextRequest) {
   try {
     const rateLimitRes = enforceRateLimit(request, "public_reviews_get", {
@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
     });
     if (rateLimitRes) return rateLimitRes;
 
+    const isDemo = request.nextUrl.searchParams.get("demo") === "true";
+    if (isDemo && process.env.NODE_ENV !== "production") {
+      return NextResponse.json({
+        success: true,
+        reviews: DEMO_BENCHMARK_REVIEWS.filter((r) => r.is_approved),
+        isDemo: true,
+      });
+    }
+
     const supabase = createServerClient();
     const { data: dbReviews, error } = await supabase
       .from("reviews")
@@ -20,56 +29,16 @@ export async function GET(request: NextRequest) {
       .eq("is_approved", true)
       .order("created_at", { ascending: false });
 
-    if (!error && dbReviews && dbReviews.length > 0) {
+    if (!error && Array.isArray(dbReviews)) {
       return NextResponse.json({
         success: true,
         reviews: dbReviews,
       });
     }
 
-    // Default approved testimonials
-    const defaultApproved = [
-      {
-        id: "rev-default-1",
-        customer_name: "Aanya Singhania",
-        dish_name: "24K Gold Saffron Shahi Tukda",
-        rating: 5,
-        comment: "Finest dessert in North India. Truly authentic royal gastronomy.",
-        is_approved: true,
-        created_at: "2026-10-09T18:30:00.000Z",
-      },
-      {
-        id: "rev-default-2",
-        customer_name: "Rohit Verma",
-        dish_name: "Burrata & Truffle Funghi Pizza",
-        rating: 5,
-        comment: "Thermal express delivery arrived steaming hot. Sourdough crust is world-class.",
-        is_approved: true,
-        created_at: "2026-10-09T19:15:00.000Z",
-      },
-      {
-        id: "rev-default-3",
-        customer_name: "Vikram Malhotra",
-        dish_name: "Truffle Malai Chaap",
-        rating: 5,
-        comment: "The clay oven smoked aroma and cashew marinade was absolutely exquisite. Grand royal dining!",
-        is_approved: true,
-        created_at: "2026-10-09T20:00:00.000Z",
-      },
-      {
-        id: "rev-default-4",
-        customer_name: "Pooja Sharma",
-        dish_name: "Dal Bukhara Grand Cru",
-        rating: 5,
-        comment: "Slow-cooked for 24 hours. Incredible depth of flavor and velvety richness.",
-        is_approved: true,
-        created_at: "2026-10-09T20:45:00.000Z",
-      },
-    ];
-
     return NextResponse.json({
       success: true,
-      reviews: defaultApproved,
+      reviews: [],
     });
   } catch (error: any) {
     console.warn("GET /api/public/reviews fallback:", error?.message);
@@ -81,7 +50,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/public/reviews
-// Customer submits review for admin moderation
+// Customer submits review for concierge moderation
 export async function POST(request: NextRequest) {
   return submitReviewHandler(request);
 }

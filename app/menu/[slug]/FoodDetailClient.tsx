@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 interface FoodDetailClientProps {
-  item: MenuItem & { rating?: number; reviewCount?: number };
+  item: MenuItem;
 }
 
 export default function FoodDetailClient({ item }: FoodDetailClientProps) {
@@ -59,8 +59,32 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
 
   const isVeg = currentDish.is_vegetarian ?? currentDish.is_veg;
   const imageSrc = currentDish.image || currentDish.image_url;
-  const rating = currentDish.rating ?? 4.8;
-  const reviewCount = currentDish.reviewCount ?? 128;
+  const [dishReviews, setDishReviews] = useState<{ rating: number; count: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/public/reviews")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.reviews)) {
+          const matching = json.reviews.filter(
+            (r: any) =>
+              (r.dish_name && r.dish_name.toLowerCase() === currentDish.name.toLowerCase()) ||
+              (r.menu_item_id && r.menu_item_id === currentDish.id)
+          );
+          if (matching.length > 0) {
+            const sum = matching.reduce((acc: number, r: any) => acc + (r.rating || 5), 0);
+            setDishReviews({
+              rating: Number((sum / matching.length).toFixed(1)),
+              count: matching.length,
+            });
+          } else {
+            setDishReviews({ rating: 0, count: 0 });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [currentDish.name, currentDish.id]);
+
   const unitPrice = currentDish.discount_price ?? currentDish.price;
   const totalPrice = unitPrice * quantity;
 
@@ -205,16 +229,28 @@ export default function FoodDetailClient({ item }: FoodDetailClientProps) {
                   {currentDish.name}
                 </h1>
 
-                {/* Rating Display (⭐ 4.8) */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/40 text-[#d4af37]">
-                    <Star className="w-4 h-4 fill-[#d4af37] text-[#d4af37]" />
-                    <span className="text-sm font-bold">{rating}</span>
+                {/* Authentic Rating Display or Signature Badge */}
+                {dishReviews && dishReviews.count > 0 ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/40 text-[#d4af37]">
+                      <Star className="w-4 h-4 fill-[#d4af37] text-[#d4af37]" />
+                      <span className="text-sm font-bold">{dishReviews.rating}</span>
+                    </div>
+                    <span className="text-xs text-[var(--text-sub)]">
+                      ({dishReviews.count} authentic guest {dishReviews.count === 1 ? "review" : "reviews"})
+                    </span>
                   </div>
-                  <span className="text-xs text-[var(--text-sub)]">
-                    ({reviewCount} authentic guest reviews)
-                  </span>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 text-[#d4af37]">
+                      <Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />
+                      <span className="text-xs font-medium">Chef&apos;s Signature</span>
+                    </div>
+                    <span className="text-xs text-[var(--text-sub)]">
+                      Be the first to review this delicacy
+                    </span>
+                  </div>
+                )}
 
                 {/* Description */}
                 <p className="text-sm sm:text-base text-[var(--text-sub)] font-light leading-relaxed">

@@ -58,8 +58,8 @@ export const fallbackCategories: Category[] = [
   },
 ];
 
-export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: number })[] = [
-  // Chinese Specialties (Phase 20)
+export const fallbackMenuItems: MenuItem[] = [
+  // Chinese Specialties
   {
     id: "item-chinese-1",
     category_id: "66666666-6666-6666-6666-666666666666",
@@ -79,8 +79,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 340,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.9,
-    reviewCount: 114,
   },
   {
     id: "item-chinese-2",
@@ -101,8 +99,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 310,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 86,
   },
   // Starters
   {
@@ -124,8 +120,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 380,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 142,
   },
   {
     id: "item-2",
@@ -146,8 +140,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 360,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 98,
   },
   {
     id: "item-3",
@@ -168,8 +160,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 310,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.7,
-    reviewCount: 64,
   },
 
   // Main Course
@@ -193,8 +183,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 460,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.9,
-    reviewCount: 215,
   },
   {
     id: "item-5",
@@ -216,8 +204,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 450,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.9,
-    reviewCount: 310,
   },
   {
     id: "item-6",
@@ -238,8 +224,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 480,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 178,
   },
   {
     id: "item-7",
@@ -260,8 +244,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 490,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.7,
-    reviewCount: 89,
   },
 
   // Woodfire Pizzas
@@ -285,8 +267,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 720,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.9,
-    reviewCount: 156,
   },
   {
     id: "item-9",
@@ -307,8 +287,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 640,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 122,
   },
 
   // Desserts
@@ -332,8 +310,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 340,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 5.0,
-    reviewCount: 284,
   },
   {
     id: "item-11",
@@ -354,8 +330,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 480,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 95,
   },
 
   // Drinks
@@ -379,8 +353,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 160,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.7,
-    reviewCount: 77,
   },
   {
     id: "item-13",
@@ -401,8 +373,6 @@ export const fallbackMenuItems: (MenuItem & { rating?: number; reviewCount?: num
     calories: 180,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
-    rating: 4.8,
-    reviewCount: 68,
   },
 ];
 

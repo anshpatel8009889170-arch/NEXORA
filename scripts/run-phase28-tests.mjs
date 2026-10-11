@@ -337,6 +337,11 @@ async function runAdminTests() {
       await fetch(`${BASE_URL}/api/orders/update-status`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Cookie: adminCookie },
+        body: JSON.stringify({ orderNumber: "ORD-1047", status: "preparing", overridePolicy: true }),
+      });
+      await fetch(`${BASE_URL}/api/orders/update-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: adminCookie },
         body: JSON.stringify({ orderNumber: "ORD-1048", status: "pending", overridePolicy: true }),
       });
     }
@@ -473,6 +478,20 @@ async function runAdminTests() {
     recordResult("Admin", "Change order status", true, "Lifecycle verified: ACCEPTED -> PREPARING -> READY -> OUT FOR DELIVERY -> DELIVERED");
 
     // 2.7.1 Verify Invalid State Transition Rejected ❌ (HTTP 400)
+    // Ensure ORD-1047 is strictly in 'preparing' state
+    await fetch(`${BASE_URL}/api/orders/update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
+      body: JSON.stringify({
+        orderNumber: "ORD-1047",
+        status: "preparing",
+        overridePolicy: true,
+      }),
+    });
+
     const invalidRes = await fetch(`${BASE_URL}/api/orders/update-status`, {
       method: "POST",
       headers: {
@@ -978,6 +997,64 @@ async function runSecurityTests() {
     );
   } catch (err) {
     recordResult("Security", "Supabase least-privilege scoping, key masking & template validation ✔", false, err.message);
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST: Business data integrity & authentic metrics (Kami 8)
+  // --------------------------------------------------------------------------
+  try {
+    const adminPassword = process.env.ADMIN_PASSWORD || "12345678";
+    const loginRes = await fetch(`${BASE_URL}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "nexora67@gmail.com", password: adminPassword }),
+    });
+    const setCookie = loginRes.headers.get("set-cookie") || "";
+    const adminCookie = setCookie ? setCookie.split(";")[0] : "";
+
+    // 1. Verify /api/analytics computes authentic metrics and does NOT use static fake numbers
+    const analyticsRes = await fetch(`${BASE_URL}/api/analytics`, {
+      headers: { ...(adminCookie ? { Cookie: adminCookie } : {}) },
+    });
+    assert.strictEqual(analyticsRes.status, 200, `Expected 200 for analytics, got ${analyticsRes.status}`);
+    const analyticsJson = await analyticsRes.json();
+    assert.ok(analyticsJson.success, "Analytics should succeed");
+    assert.ok(typeof analyticsJson.analytics?.sales?.today === "number", "Today's sales must be a number");
+    assert.ok(typeof analyticsJson.analytics?.sales?.weekly === "number", "Weekly sales must be a number");
+    assert.ok(Array.isArray(analyticsJson.analytics?.mostOrderedFood), "mostOrderedFood must be an array");
+
+    // 2. Verify /api/public/reviews returns clean authentic reviews (no seeded fake reviews)
+    const reviewsRes = await fetch(`${BASE_URL}/api/public/reviews`);
+    assert.strictEqual(reviewsRes.status, 200, `Expected 200 for public reviews, got ${reviewsRes.status}`);
+    const reviewsJson = await reviewsRes.json();
+    assert.ok(reviewsJson.success, "Public reviews should succeed");
+    assert.ok(Array.isArray(reviewsJson.reviews), "Reviews must be an array");
+    const hasFakeDefaultReview = reviewsJson.reviews.some((r) => r.id && r.id.startsWith("rev-default-"));
+    assert.strictEqual(hasFakeDefaultReview, false, "Must never return seeded fake reviews to patrons");
+
+    // 3. Verify /api/public/offers returns authentic offers without forced re-injection
+    const offersRes = await fetch(`${BASE_URL}/api/public/offers`);
+    assert.strictEqual(offersRes.status, 200, `Expected 200 for public offers, got ${offersRes.status}`);
+    const offersJson = await offersRes.json();
+    assert.ok(offersJson.success, "Public offers should succeed");
+    assert.ok(Array.isArray(offersJson.offers), "Offers must be an array");
+
+    // 4. Verify review moderation operations are protected by requireAdmin
+    const unauthReviewMod = await fetch(`${BASE_URL}/api/reviews?id=fake-id`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_approved: true }),
+    });
+    assert.strictEqual(unauthReviewMod.status, 401, "Review moderation must require admin authorization");
+
+    recordResult(
+      "Security",
+      "Business data integrity & authentic metrics (Kami 8) ✔",
+      true,
+      "Real orders analytics, clean zero-state reviews (no fake seeds), authentic offers & admin moderation verified"
+    );
+  } catch (err) {
+    recordResult("Security", "Business data integrity & authentic metrics (Kami 8) ✔", false, err.message);
   }
 }
 

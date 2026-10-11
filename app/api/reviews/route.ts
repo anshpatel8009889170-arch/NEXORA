@@ -5,10 +5,16 @@ import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeString } from "@/lib/security/validation";
 import { requireAdmin } from "@/lib/security/requireAdmin";
 
-// In-memory store for fallback/demo when remote database lacks items
-let inMemoryReviews: Review[] = [
+// In-memory runtime cache for development/offline fallback
+let inMemoryReviews: Review[] = [];
+
+/**
+ * Isolated demo benchmark reviews for development/preview testing ONLY when ?demo=true is set.
+ * In production or normal customer visits, these are NEVER returned.
+ */
+export const DEMO_BENCHMARK_REVIEWS: Review[] = [
   {
-    id: "rev-default-1",
+    id: "demo-rev-1",
     customer_name: "Aanya Singhania",
     dish_name: "24K Gold Saffron Shahi Tukda",
     rating: 5,
@@ -17,7 +23,7 @@ let inMemoryReviews: Review[] = [
     created_at: "2026-10-09T18:30:00.000Z",
   },
   {
-    id: "rev-default-2",
+    id: "demo-rev-2",
     customer_name: "Rohit Verma",
     dish_name: "Burrata & Truffle Funghi Pizza",
     rating: 5,
@@ -26,7 +32,7 @@ let inMemoryReviews: Review[] = [
     created_at: "2026-10-09T19:15:00.000Z",
   },
   {
-    id: "rev-default-3",
+    id: "demo-rev-3",
     customer_name: "Vikram Malhotra",
     dish_name: "Truffle Malai Chaap",
     rating: 5,
@@ -35,7 +41,7 @@ let inMemoryReviews: Review[] = [
     created_at: "2026-10-09T20:00:00.000Z",
   },
   {
-    id: "rev-default-4",
+    id: "demo-rev-4",
     customer_name: "Pooja Sharma",
     dish_name: "Dal Bukhara Grand Cru",
     rating: 5,
@@ -44,54 +50,47 @@ let inMemoryReviews: Review[] = [
     created_at: "2026-10-09T20:45:00.000Z",
   },
   {
-    id: "rev-default-5",
+    id: "demo-rev-5",
     customer_name: "Aditya Saxena",
     dish_name: "Paneer Lababdar",
     rating: 5,
     comment: "Food was amazing. Truly extraordinary pure-veg culinary art.",
-    is_approved: false, // Pending moderation for Admin testing!
+    is_approved: false, // Pending moderation for Admin testing
     created_at: "2026-10-10T08:15:00.000Z",
   },
 ];
 
-// Helper to seed defaults into DB if table is completely empty
-async function seedDefaultReviewsIfEmpty(supabase: any) {
-  try {
-    const { count, error } = await supabase
-      .from("reviews")
-      .select("*", { count: "exact", head: true });
-
-    if (!error && (count === 0 || count === null)) {
-      await supabase.from("reviews").insert(
-        inMemoryReviews.map((r) => ({
-          customer_name: r.customer_name,
-          dish_name: r.dish_name,
-          rating: r.rating,
-          comment: r.comment,
-          is_approved: r.is_approved,
-        }))
-      );
-    }
-  } catch (err) {
-    // Non-fatal if table doesn't support head or seed
-  }
-}
-
 // ============================================================================
 // 1. GET: Fetch Reviews
 // - Public: Only returns is_approved = true
-// - Admin / all=true: Returns all reviews (approved + pending/hidden)
+// - Admin / all=true: Returns all reviews (approved + pending moderation)
 // ============================================================================
 export async function GET(request: NextRequest) {
   try {
-    const rateLimitRes = enforceRateLimit(request, "get_reviews", { limit: 120, windowMs: 60 * 1000 });
+    const rateLimitRes = enforceRateLimit(request, "get_reviews", {
+      limit: 120,
+      windowMs: 60 * 1000,
+    });
     if (rateLimitRes) return rateLimitRes;
 
     const { searchParams } = new URL(request.url);
     const showAll = searchParams.get("all") === "true";
     const userId = searchParams.get("user_id");
+    const isDemo = searchParams.get("demo") === "true";
 
-    // Viewing all reviews (including pending/unapproved) is restricted to administrators
+    // Demo reviews only allowed when explicitly requested in non-production
+    if (isDemo && process.env.NODE_ENV !== "production") {
+      const filtered = showAll
+        ? DEMO_BENCHMARK_REVIEWS
+        : DEMO_BENCHMARK_REVIEWS.filter((r) => r.is_approved);
+      return NextResponse.json({
+        success: true,
+        reviews: filtered,
+        isDemo: true,
+      });
+    }
+
+    // Viewing unapproved/pending reviews is strictly restricted to authenticated administrators
     if (showAll) {
       const auth = await requireAdmin(request, ["owner", "admin"]);
       if (!auth.authorized) {
@@ -100,30 +99,31 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createServerClient();
-    await seedDefaultReviewsIfEmpty(supabase);
-
-    let query = supabase.from("reviews").select("*").order("created_at", { ascending: false });
+    let query = supabase
+      .from("reviews")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (!showAll && !userId) {
-      // Public site: Only approved reviews
+      // Public view: ONLY approved reviews from real patrons
       query = query.eq("is_approved", true);
     }
 
     if (userId) {
-      // User account page: show user's own reviews
+      // Patron account view: show user's own reviews
       query = query.eq("user_id", userId);
     }
 
     const { data: dbReviews, error } = await query;
 
-    if (!error && dbReviews && dbReviews.length > 0) {
+    if (!error && Array.isArray(dbReviews)) {
       return NextResponse.json({
         success: true,
         reviews: dbReviews,
       });
     }
 
-    // Fallback to in-memory store
+    // Fallback to in-memory runtime store (returns real reviews submitted during session)
     let filtered = [...inMemoryReviews];
     if (!showAll && !userId) {
       filtered = filtered.filter((r) => r.is_approved);
@@ -138,27 +138,23 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.warn("GET /api/reviews fallback:", error?.message);
-    const { searchParams } = new URL(request.url);
-    const showAll = searchParams.get("all") === "true";
-
-    const filtered = showAll
-      ? inMemoryReviews
-      : inMemoryReviews.filter((r) => r.is_approved);
-
     return NextResponse.json({
       success: true,
-      reviews: filtered,
+      reviews: [],
     });
   }
 }
 
 // ============================================================================
 // 2. POST: Customer Submits Review
-// - Default is_approved = false (awaiting admin approval)
+// - Real reviews default to is_approved = false (awaiting concierge moderation)
 // ============================================================================
 export async function POST(request: NextRequest) {
   try {
-    const rateLimitRes = enforceRateLimit(request, "submit_review", { limit: 6, windowMs: 60 * 1000 });
+    const rateLimitRes = enforceRateLimit(request, "submit_review", {
+      limit: 6,
+      windowMs: 60 * 1000,
+    });
     if (rateLimitRes) return rateLimitRes;
 
     const body = await request.json();
@@ -201,10 +197,10 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // Save to in-memory store
+    // Save to runtime store
     inMemoryReviews.unshift(newReview);
 
-    // Try saving to Supabase
+    // Save to database
     try {
       const supabase = createServerClient();
       const { data: dbData, error: dbError } = await supabase
@@ -226,7 +222,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           review: dbData,
-          message: "Thank you! Your review has been submitted for moderation and will appear on our website once approved.",
+          message:
+            "Thank you! Your review has been submitted for moderation and will appear on our website once approved.",
         });
       }
     } catch (dbErr) {
@@ -236,7 +233,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       review: newReview,
-      message: "Thank you! Your review has been submitted for moderation and will appear on our website once approved.",
+      message:
+        "Thank you! Your review has been submitted for moderation and will appear on our website once approved.",
     });
   } catch (error: any) {
     console.error("POST /api/reviews error:", error);
@@ -258,7 +256,10 @@ export async function PATCH(request: NextRequest) {
       return auth.response;
     }
 
-    const rateLimitRes = enforceRateLimit(request, "patch_review", { limit: 60, windowMs: 60 * 1000 });
+    const rateLimitRes = enforceRateLimit(request, "patch_review", {
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
     if (rateLimitRes) return rateLimitRes;
 
     const body = await request.json();
@@ -292,7 +293,9 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({
           success: true,
           review: data,
-          message: is_approved ? "Review approved and published!" : "Review hidden from public view.",
+          message: is_approved
+            ? "Review approved and published!"
+            : "Review hidden from public view.",
         });
       }
     } catch (dbErr) {
@@ -302,7 +305,9 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({
       success: true,
       review: idx !== -1 ? inMemoryReviews[idx] : { id, is_approved },
-      message: is_approved ? "Review approved and published!" : "Review hidden from public view.",
+      message: is_approved
+        ? "Review approved and published!"
+        : "Review hidden from public view.",
     });
   } catch (error: any) {
     console.error("PATCH /api/reviews error:", error);
@@ -324,7 +329,10 @@ export async function DELETE(request: NextRequest) {
       return auth.response;
     }
 
-    const rateLimitRes = enforceRateLimit(request, "delete_review", { limit: 60, windowMs: 60 * 1000 });
+    const rateLimitRes = enforceRateLimit(request, "delete_review", {
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
     if (rateLimitRes) return rateLimitRes;
 
     const { searchParams } = new URL(request.url);

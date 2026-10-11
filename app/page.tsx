@@ -118,30 +118,10 @@ export default function Home() {
     { name: "Artisanal Desserts & Drinks", count: "16 Delights", tag: "Sweet & Sips" },
   ];
 
-  // Guest Reviews (Public website par sirf approved reviews - Phase 25)
-  const [reviews, setReviews] = useState([
-    {
-      name: "Vikram Malhotra",
-      role: "Food Connoisseur",
-      comment:
-        "The Truffle Malai Chaap and Dal Bukhara Grand Cru are pure gastronomic magic. Unmatched pure-veg luxury ambiance and prompt delivery!",
-      rating: 5,
-    },
-    {
-      name: "Aanya Singhania",
-      role: "Verified Guest",
-      comment:
-        "NEXORA's 24K Gold Shahi Tukda is by far the finest dessert I have tasted in North India. Truly authentic royal gastronomy.",
-      rating: 5,
-    },
-    {
-      name: "Rohit Verma",
-      role: "Regular Patron",
-      comment:
-        "Thermal express delivery arrived steaming hot in exactly 30 minutes. Sourdough pizza crust and packaging are world-class.",
-      rating: 5,
-    },
-  ]);
+  // Guest Reviews (Public website par sirf approved authentic reviews)
+  const [reviews, setReviews] = useState<
+    { name: string; role: string; comment: string; rating: number }[]
+  >([]);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   // Sync approved reviews from API
@@ -391,35 +371,58 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {reviews.map((rev, idx) => (
-            <div
-              key={idx}
-              className="p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-sm flex flex-col justify-between space-y-6"
-            >
-              <div className="space-y-4">
-                {/* 5 Golden Stars */}
-                <div className="flex items-center gap-1 text-[#d4af37]">
-                  {[...Array(rev.rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-current" />
-                  ))}
+        {reviews.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {reviews.map((rev, idx) => (
+              <div
+                key={idx}
+                className="p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-sm flex flex-col justify-between space-y-6"
+              >
+                <div className="space-y-4">
+                  {/* 5 Golden Stars */}
+                  <div className="flex items-center gap-1 text-[#d4af37]">
+                    {[...Array(rev.rating)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-current" />
+                    ))}
+                  </div>
+                  <p className="text-sm text-[var(--text-sub)] leading-relaxed italic font-light">
+                    &ldquo;{rev.comment}&rdquo;
+                  </p>
                 </div>
-                <p className="text-sm text-[var(--text-sub)] leading-relaxed italic font-light">
-                  &ldquo;{rev.comment}&rdquo;
-                </p>
-              </div>
 
-              <div className="pt-4 border-t border-[var(--card-border)]">
-                <h4 className="text-sm font-serif font-bold text-[var(--text-main)]">
-                  {rev.name}
-                </h4>
-                <p className="text-[11px] text-[#d4af37] uppercase tracking-wider mt-0.5">
-                  {rev.role}
-                </p>
+                <div className="pt-4 border-t border-[var(--card-border)]">
+                  <h4 className="text-sm font-serif font-bold text-[var(--text-main)]">
+                    {rev.name}
+                  </h4>
+                  <p className="text-[11px] text-[#d4af37] uppercase tracking-wider mt-0.5">
+                    {rev.role}
+                  </p>
+                </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-10 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/25 max-w-2xl mx-auto text-center space-y-4 shadow-xl">
+            <div className="flex items-center justify-center gap-1 text-[#d4af37]">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star key={s} className="w-5 h-5 fill-current opacity-80" />
+              ))}
             </div>
-          ))}
-        </div>
+            <h3 className="text-2xl font-serif font-bold text-[var(--text-main)]">
+              Be the First to Review NEXORA
+            </h3>
+            <p className="text-xs sm:text-sm text-[var(--text-sub)] font-light max-w-md mx-auto leading-relaxed">
+              Every dish is handcrafted with utmost royal perfection. Have you experienced our culinary journey? Share your thoughts with our master chefs.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsReviewModalOpen(true)}
+              className="mt-2 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-gold-gradient text-black font-semibold text-xs uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow-md cursor-pointer"
+            >
+              <span>Write the First Review</span>
+            </button>
+          </div>
+        )}
 
         {/* Customer Write Review Callout (Phase 25) */}
         <div className="mt-14 text-center p-8 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/30 max-w-xl mx-auto space-y-3 shadow-lg">
