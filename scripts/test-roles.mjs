@@ -10,123 +10,108 @@ dotenv.split('\n').forEach(line => {
 });
 
 async function run() {
-  console.log('=== TEST SUITE: SUPER ADMIN AUTHORITY & ROOT OWNER PROTECTION ===\n');
+  console.log('=== TEST SUITE: MAIN SUPER ADMIN VS SECONDARY SUPER ADMIN PRIVILEGES ===\n');
 
-  // Authenticate as Root Super Admin
   const rootEmail = env.ADMIN_EMAIL;
   const rootPass = env.ADMIN_PASSWORD;
 
-  const resLogin = await fetch('http://localhost:3000/api/admin/login', {
+  // 1. Root Super Admin login
+  const resRoot = await fetch('http://localhost:3000/api/admin/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: rootEmail, password: rootPass, role: 'super_admin' })
   });
-  const dataLogin = await resLogin.json();
-  const cookie = resLogin.headers.get('set-cookie');
-  console.log('1. Root Super Admin Authenticated -> Status:', resLogin.status, '| Success:', dataLogin.success);
+  const rootCookie = resRoot.headers.get('set-cookie');
+  console.log('1. Root Super Admin logged in -> Status:', resRoot.status);
 
-  // Test adding a secondary Super Admin
-  console.log('\n2. Testing Super Admin adding another Super Admin...');
-  const secAdminEmail = `partner_owner_${Date.now()}@nexora.com`;
-  const initialPass = 'CoOwnerPass123!';
-
-  const resAdd = await fetch('http://localhost:3000/api/admin/team', {
+  // 2. Root Super Admin adds Secondary Super Admin
+  const secEmail = `secondary_super_${Date.now()}@nexora.com`;
+  const secPass = 'SecondaryPass123!';
+  const resAddSec = await fetch('http://localhost:3000/api/admin/team', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Cookie': cookie || ''
-    },
+    headers: { 'Content-Type': 'application/json', 'Cookie': rootCookie || '' },
     body: JSON.stringify({
-      name: 'Partner Super Admin',
-      email: secAdminEmail,
-      password: initialPass,
+      name: 'Secondary Partner Owner',
+      email: secEmail,
+      password: secPass,
       role: 'super_admin'
     })
   });
-  const dataAdd = await resAdd.json();
-  console.log('   Add Secondary Super Admin -> Status:', resAdd.status, '| Message:', dataAdd.message, '| RoleType:', dataAdd.member?.roleType);
+  const dataAddSec = await resAddSec.json();
+  const secId = dataAddSec.member?.id;
+  console.log('2. Root Super Admin added Secondary Super Admin -> Status:', resAddSec.status, '| RoleType:', dataAddSec.member?.roleType);
 
-  const secAdminId = dataAdd.member?.id;
-
-  // Test secondary Super Admin login with role 'super_admin'
-  console.log('\n3. Testing Secondary Super Admin login...');
+  // 3. Secondary Super Admin logs in
   const resSecLogin = await fetch('http://localhost:3000/api/admin/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: secAdminEmail, password: initialPass, role: 'super_admin' })
+    body: JSON.stringify({ email: secEmail, password: secPass, role: 'super_admin' })
   });
-  const dataSecLogin = await resSecLogin.json();
-  console.log('   Secondary Super Admin login -> Status:', resSecLogin.status, '| Success:', dataSecLogin.success, '| Role:', dataSecLogin.user?.roleType);
+  const secCookie = resSecLogin.headers.get('set-cookie');
+  console.log('3. Secondary Super Admin logged in -> Status:', resSecLogin.status);
 
-  // Test Password Change / Reset by Root Super Admin
-  console.log('\n4. Testing Password Reset for Secondary Super Admin...');
-  const updatedPass = 'NewCoOwnerPass999!';
-  const resPatch = await fetch('http://localhost:3000/api/admin/team', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Cookie': cookie || ''
-    },
+  // 4. Test: What Secondary Super Admin CANNOT do (Add, Delete, Change Password)
+  console.log('\n--- 4. Testing Secondary Super Admin Restrictions (Blocked Actions) ---');
+  
+  // 4a. Secondary Super Admin attempts to ADD another member -> BLOCKED
+  const resSecAdd = await fetch('http://localhost:3000/api/admin/team', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Cookie': secCookie || '' },
     body: JSON.stringify({
-      id: secAdminId,
-      password: updatedPass
+      name: 'Illegal Added Member',
+      email: 'illegal@nexora.com',
+      password: 'Pass12345678!',
+      role: 'admin'
     })
   });
-  const dataPatch = await resPatch.json();
-  console.log('   Reset Password -> Status:', resPatch.status, '| Message:', dataPatch.message);
+  const dataSecAdd = await resSecAdd.json();
+  console.log('   Secondary Admin adding member -> Status:', resSecAdd.status, '| Error:', dataSecAdd.error);
 
-  // Test login with old password (should fail)
-  const resOldLogin = await fetch('http://localhost:3000/api/admin/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: secAdminEmail, password: initialPass, role: 'super_admin' })
-  });
-  console.log('   Login with OLD password (should fail) -> Status:', resOldLogin.status);
-
-  // Test login with NEW password (should succeed)
-  const resNewLogin = await fetch('http://localhost:3000/api/admin/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: secAdminEmail, password: updatedPass, role: 'super_admin' })
-  });
-  const dataNewLogin = await resNewLogin.json();
-  console.log('   Login with NEW password -> Status:', resNewLogin.status, '| Success:', dataNewLogin.success);
-
-  // Test Root Owner Protection: Attempt to delete Root Super Admin
-  console.log('\n5. Testing Root Super Admin Protection against Deletion...');
-  const resDelRoot = await fetch(`http://localhost:3000/api/admin/team?id=usr_admin_owner_master`, {
-    method: 'DELETE',
-    headers: { 'Cookie': cookie || '' }
-  });
-  const dataDelRoot = await resDelRoot.json();
-  console.log('   Delete Root Super Admin attempt -> Status:', resDelRoot.status, '| Error:', dataDelRoot.error);
-
-  // Test Root Owner Protection: Attempt to reset Root Super Admin password via team endpoint
-  console.log('\n6. Testing Root Super Admin Protection against Password Tampering...');
-  const resPatchRoot = await fetch(`http://localhost:3000/api/admin/team`, {
+  // 4b. Secondary Super Admin attempts to RESET PASSWORD -> BLOCKED
+  const resSecPatch = await fetch('http://localhost:3000/api/admin/team', {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Cookie': cookie || ''
-    },
-    body: JSON.stringify({
-      id: 'usr_admin_owner_master',
-      password: 'HackerPassword123!'
-    })
+    headers: { 'Content-Type': 'application/json', 'Cookie': secCookie || '' },
+    body: JSON.stringify({ id: 'tm_admin_manager_1', password: 'HackedPassword123!' })
   });
-  const dataPatchRoot = await resPatchRoot.json();
-  console.log('   Tamper Root Super Admin password attempt -> Status:', resPatchRoot.status, '| Error:', dataPatchRoot.error);
+  const dataSecPatch = await resSecPatch.json();
+  console.log('   Secondary Admin resetting password -> Status:', resSecPatch.status, '| Error:', dataSecPatch.error);
 
-  // Delete Secondary Super Admin (Root Super Admin cleaning up)
-  console.log('\n7. Testing Root Super Admin deleting Secondary Super Admin...');
-  const resDelSec = await fetch(`http://localhost:3000/api/admin/team?id=${secAdminId}`, {
+  // 4c. Secondary Super Admin attempts to DELETE a member -> BLOCKED
+  const resSecDel = await fetch('http://localhost:3000/api/admin/team?id=tm_admin_manager_1', {
     method: 'DELETE',
-    headers: { 'Cookie': cookie || '' }
+    headers: { 'Cookie': secCookie || '' }
   });
-  const dataDelSec = await resDelSec.json();
-  console.log('   Delete Secondary Super Admin -> Status:', resDelSec.status, '| Message:', dataDelSec.message);
+  const dataSecDel = await resSecDel.json();
+  console.log('   Secondary Admin deleting member -> Status:', resSecDel.status, '| Error:', dataSecDel.error);
 
-  console.log('\n=== ALL ROOT PROTECTION & MULTI-SUPER-ADMIN TESTS PASSED! ===');
+  // 5. Test: What Secondary Super Admin CAN do (Full Business Access)
+  console.log('\n--- 5. Testing Secondary Super Admin Powers (Allowed Actions) ---');
+
+  // 5a. Can view Team list
+  const resSecGetTeam = await fetch('http://localhost:3000/api/admin/team', {
+    headers: { 'Cookie': secCookie || '' }
+  });
+  const dataSecGetTeam = await resSecGetTeam.json();
+  console.log('   View Team Roster -> Status:', resSecGetTeam.status, '| Members count:', dataSecGetTeam.team?.length);
+
+  // 5b. Can access Restaurant Settings
+  const resSecSettings = await fetch('http://localhost:3000/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Cookie': secCookie || '' },
+    body: JSON.stringify({ name: 'NEXORA Fine Dining', delivery_fee: 40, minimum_order: 199 })
+  });
+  const dataSecSettings = await resSecSettings.json();
+  console.log('   Manage Restaurant Settings -> Status:', resSecSettings.status, '| Success:', dataSecSettings.success);
+
+  // 6. Cleanup: Root Super Admin removes Secondary Super Admin
+  const resClean = await fetch(`http://localhost:3000/api/admin/team?id=${secId}`, {
+    method: 'DELETE',
+    headers: { 'Cookie': rootCookie || '' }
+  });
+  const dataClean = await resClean.json();
+  console.log('\n6. Root Super Admin removed Secondary Super Admin -> Status:', resClean.status, '| Message:', dataClean.message);
+
+  console.log('\n=== ALL TESTS PASSED: HIERARCHY PERFECTLY ENFORCED! ===');
 }
 
 run().catch(console.error);

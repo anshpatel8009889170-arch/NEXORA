@@ -1168,6 +1168,10 @@ export default function AdminDashboardPage() {
   const isSuperAdmin = currentRole === "owner" || currentRole === "super_admin";
   const isAdmin = currentRole === "admin";
   const isSubAdmin = currentRole === "staff" || currentRole === "sub_admin" || currentRole === "delivery";
+  const isRootSuperAdmin =
+    isSuperAdmin &&
+    (adminUser?.id === "usr_admin_owner_master" ||
+      (adminUser?.email || "").toLowerCase() === "nexora67@gmail.com");
 
   // Tab View Guard: Ensure Admins and Sub-Admins cannot access unauthorized views
   useEffect(() => {
@@ -2311,14 +2315,21 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsTeamModalOpen(true)}
-                  className="px-5 py-3 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add New Member</span>
-                </button>
+                {isRootSuperAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsTeamModalOpen(true)}
+                    className="px-5 py-3 rounded-full text-xs font-bold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add New Member</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-semibold text-[var(--text-sub)] bg-[var(--card-bg)] border border-[var(--card-border)]">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#d4af37]" />
+                    <span>Roster View (Managed by Main Super Admin)</span>
+                  </div>
+                )}
               </div>
 
               {teamFeedback && (
@@ -2405,29 +2416,31 @@ export default function AdminDashboardPage() {
                           </div>
                         </div>
 
-                        {/* Actions: Change Password & Delete Member */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPasswordModalMember({ id: member.id, name: member.name });
-                              setNewPasswordValue("");
-                            }}
-                            className="p-1.5 rounded-lg text-[var(--text-sub)] hover:text-[#d4af37] hover:bg-[#d4af37]/10 transition-all cursor-pointer"
-                            title="Change Password"
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
+                        {/* Actions: Change Password & Delete Member (Exclusively for Root Super Admin) */}
+                        {isRootSuperAdmin && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPasswordModalMember({ id: member.id, name: member.name });
+                                setNewPasswordValue("");
+                              }}
+                              className="p-1.5 rounded-lg text-[var(--text-sub)] hover:text-[#d4af37] hover:bg-[#d4af37]/10 transition-all cursor-pointer"
+                              title="Change Password"
+                            >
+                              <Key className="w-4 h-4" />
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTeamMember(member.id, member.name)}
-                            className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all cursor-pointer"
-                            title="Remove member"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTeamMember(member.id, member.name)}
+                              className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all cursor-pointer"
+                              title="Remove member"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between pt-2 border-t border-[var(--card-border)] text-xs">

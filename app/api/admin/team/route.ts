@@ -41,6 +41,18 @@ export async function POST(req: NextRequest) {
     return adminCheck.response;
   }
 
+  // Only Main Root Super Admin has permission to add new members
+  const callerIsRoot = isRootOwnerAccount(adminCheck.user.id) || isRootOwnerAccount(adminCheck.user.email);
+  if (!callerIsRoot) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Access Denied: Only the Main Super Admin has authority to add new team members.",
+      },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await req.json();
     const rawName = sanitizeString(body?.name, 80);
@@ -125,6 +137,18 @@ export async function PATCH(req: NextRequest) {
     return adminCheck.response;
   }
 
+  // Only Main Root Super Admin has permission to reset passwords
+  const callerIsRoot = isRootOwnerAccount(adminCheck.user.id) || isRootOwnerAccount(adminCheck.user.email);
+  if (!callerIsRoot) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Access Denied: Only the Main Super Admin has authority to change or reset passwords.",
+      },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await req.json();
     const memberId = String(body?.id || "").trim();
@@ -183,6 +207,18 @@ export async function DELETE(req: NextRequest) {
   const adminCheck = await requireAdmin(req, ["owner"]);
   if (!adminCheck.authorized) {
     return adminCheck.response;
+  }
+
+  // Only Main Root Super Admin has permission to delete team members
+  const callerIsRoot = isRootOwnerAccount(adminCheck.user.id) || isRootOwnerAccount(adminCheck.user.email);
+  if (!callerIsRoot) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Access Denied: Only the Main Super Admin has authority to remove team members.",
+      },
+      { status: 403 }
+    );
   }
 
   const { searchParams } = new URL(req.url);
