@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { verifyRoleAuthorization } from "@/lib/security/adminAuth";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 
 export async function POST(request: NextRequest) {
   try {
-    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin", "staff"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    const auth = await requireAdmin(request, ["owner", "admin", "staff"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const formData = await request.formData();

@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { RestaurantSettings } from "@/types/database";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeString, validateAmount, validatePhone, validateEmail } from "@/lib/security/validation";
-import { verifyRoleAuthorization } from "@/lib/security/adminAuth";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 
 export const DEFAULT_RESTAURANT_SETTINGS: RestaurantSettings = {
   id: "default",
@@ -67,9 +67,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     // Only owner or admin can modify restaurant financial and operational settings
-    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const rateLimitRes = enforceRateLimit(request, "save_settings", { limit: 30, windowMs: 60 * 1000 });

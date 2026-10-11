@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeCouponCode, sanitizeString, validateAmount } from "@/lib/security/validation";
-import { verifyRoleAuthorization } from "@/lib/security/adminAuth";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 import {
   getRuntimeOffers,
   saveRuntimeOffer,
@@ -88,9 +88,9 @@ export async function GET(request: NextRequest) {
 // POST: Create or Update an offer
 export async function POST(request: NextRequest) {
   try {
-    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const rateLimitRes = enforceRateLimit(request, "post_offers", { limit: 30, windowMs: 60 * 1000 });
@@ -186,9 +186,9 @@ export async function POST(request: NextRequest) {
 // PATCH: Toggle enable/disable
 export async function PATCH(request: NextRequest) {
   try {
-    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const rateLimitRes = enforceRateLimit(request, "patch_offers", { limit: 30, windowMs: 60 * 1000 });
@@ -236,9 +236,9 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Remove offer
 export async function DELETE(request: NextRequest) {
   try {
-    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const rateLimitRes = enforceRateLimit(request, "delete_offers", { limit: 30, windowMs: 60 * 1000 });

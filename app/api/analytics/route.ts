@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { verifyRoleAuthorization } from "@/lib/security/adminAuth";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 
 export interface MostOrderedItem {
   rank: number;
@@ -111,9 +111,9 @@ export const DEFAULT_ANALYTICS: AnalyticsData = {
 
 export async function GET(request: NextRequest) {
   try {
-    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const supabase = createServerClient();

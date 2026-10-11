@@ -3,14 +3,14 @@ import { createServerClient } from "@/lib/supabase/server";
 import { OrderStatus } from "@/types/database";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeString } from "@/lib/security/validation";
-import { verifyRoleAuthorization } from "@/lib/security/adminAuth";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 
 export async function POST(req: NextRequest) {
   try {
-    // Enforce role authorization (owner, admin, staff)
-    const authCheck = await verifyRoleAuthorization(req, ["owner", "admin", "staff"]);
-    if (!authCheck.authorized) {
-      return authCheck.errorResponse!;
+    // 1. Enforce Server-Side Administrator / Staff Authentication
+    const auth = await requireAdmin(req, ["owner", "admin", "staff"]);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const rateLimitRes = enforceRateLimit(req, "update_order_status", { limit: 60, windowMs: 60 * 1000 });

@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { Review } from "@/types/database";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeString } from "@/lib/security/validation";
+import { requireAdmin } from "@/lib/security/requireAdmin";
 
 // In-memory store for fallback/demo when remote database lacks items
 let inMemoryReviews: Review[] = [
@@ -89,6 +90,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const showAll = searchParams.get("all") === "true";
     const userId = searchParams.get("user_id");
+
+    // Viewing all reviews (including pending/unapproved) is restricted to administrators
+    if (showAll) {
+      const auth = await requireAdmin(request, ["owner", "admin"]);
+      if (!auth.authorized) {
+        return auth.response;
+      }
+    }
 
     const supabase = createServerClient();
     await seedDefaultReviewsIfEmpty(supabase);
@@ -243,6 +252,12 @@ export async function POST(request: NextRequest) {
 // ============================================================================
 export async function PATCH(request: NextRequest) {
   try {
+    // Admin / Owner Authorization required to moderate customer reviews
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
     const rateLimitRes = enforceRateLimit(request, "patch_review", { limit: 60, windowMs: 60 * 1000 });
     if (rateLimitRes) return rateLimitRes;
 
@@ -303,6 +318,12 @@ export async function PATCH(request: NextRequest) {
 // ============================================================================
 export async function DELETE(request: NextRequest) {
   try {
+    // Admin / Owner Authorization required to permanently remove reviews
+    const auth = await requireAdmin(request, ["owner", "admin"]);
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
     const rateLimitRes = enforceRateLimit(request, "delete_review", { limit: 60, windowMs: 60 * 1000 });
     if (rateLimitRes) return rateLimitRes;
 

@@ -562,6 +562,78 @@ async function runSecurityTests() {
     recordResult("Security", "Anonymous → admin API ❌", false, err.message);
   }
 
+  // 3.3.1 Anonymous Mutating Endpoints Guarded ❌
+  try {
+    const endpointsToTest = [
+      { url: `${BASE_URL}/api/orders/update-status`, method: "POST", body: { orderNumber: "NEX-9999", status: "delivered" } },
+      { url: `${BASE_URL}/api/offers`, method: "POST", body: { code: "HACK50", discount_value: 50 } },
+      { url: `${BASE_URL}/api/offers`, method: "PATCH", body: { code: "SAVE50", is_active: false } },
+      { url: `${BASE_URL}/api/offers?code=SAVE50`, method: "DELETE" },
+      { url: `${BASE_URL}/api/settings`, method: "POST", body: { name: "Hacked Dining" } },
+      { url: `${BASE_URL}/api/reviews`, method: "PATCH", body: { id: "rev-default-1", is_approved: true } },
+      { url: `${BASE_URL}/api/reviews?id=rev-default-1`, method: "DELETE" },
+      { url: `${BASE_URL}/api/reviews?all=true`, method: "GET" },
+      { url: `${BASE_URL}/api/analytics`, method: "GET" },
+      { url: `${BASE_URL}/api/upload`, method: "POST" },
+      { url: `${BASE_URL}/api/admin/orders`, method: "GET" },
+      { url: `${BASE_URL}/api/admin/menu`, method: "POST", body: { name: "Illegal Dish", price: 100 } },
+      { url: `${BASE_URL}/api/admin/settings`, method: "GET" },
+      { url: `${BASE_URL}/api/admin/reviews`, method: "GET" },
+      { url: `${BASE_URL}/api/admin/offers`, method: "GET" },
+      { url: `${BASE_URL}/api/admin/analytics`, method: "GET" },
+    ];
+
+    for (const ep of endpointsToTest) {
+      const opts = { method: ep.method, headers: { "Content-Type": "application/json" } };
+      if (ep.body) opts.body = JSON.stringify(ep.body);
+      const res = await fetch(ep.url, opts);
+      assert.strictEqual(
+        res.status,
+        401,
+        `Endpoint ${ep.method} ${ep.url} MUST return 401 Unauthorized for anonymous caller (got ${res.status})`
+      );
+    }
+
+    recordResult(
+      "Security",
+      "Mutating APIs requireAdmin guard ❌",
+      true,
+      `All 16 sensitive mutating & admin endpoints returned HTTP 401 Unauthorized`
+    );
+  } catch (err) {
+    recordResult("Security", "Mutating APIs requireAdmin guard ❌", false, err.message);
+  }
+
+  // 3.3.2 Public Endpoints Accessible Without Session ✔
+  try {
+    const publicEndpoints = [
+      `${BASE_URL}/api/public/menu`,
+      `${BASE_URL}/api/public/offers`,
+      `${BASE_URL}/api/public/settings`,
+      `${BASE_URL}/api/public/reviews`,
+    ];
+
+    for (const url of publicEndpoints) {
+      const res = await fetch(url);
+      assert.strictEqual(
+        res.status,
+        200,
+        `Public endpoint ${url} should be accessible (200 OK), got ${res.status}`
+      );
+      const json = await res.json();
+      assert.strictEqual(json.success, true, `Endpoint ${url} should return success: true`);
+    }
+
+    recordResult(
+      "Security",
+      "Public APIs namespace separation ✔",
+      true,
+      `All 4 public endpoints (/api/public/*) accessible without credentials`
+    );
+  } catch (err) {
+    recordResult("Security", "Public APIs namespace separation ✔", false, err.message);
+  }
+
   // 3.4 Invalid Order Price → Reject ❌
   try {
     // A. Negative amount
