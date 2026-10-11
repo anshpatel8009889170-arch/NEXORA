@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
 
 function LoginContent() {
   const router = useRouter();
@@ -34,6 +35,8 @@ function LoginContent() {
     updateProfileName,
     signOut,
   } = useAuth();
+
+  const { addToCart } = useCart();
 
   // Steps: "phone" | "otp" | "name"
   const [step, setStep] = useState<"phone" | "otp" | "name">("phone");
@@ -102,6 +105,7 @@ function LoginContent() {
         setStep("name");
         setSuccessMessage("Phone verified! Please enter your name.");
       } else {
+        processPendingCartItem();
         setSuccessMessage("Authentication successful! Welcome to NEXORA.");
         setTimeout(() => {
           router.push(redirectPath);
@@ -109,6 +113,24 @@ function LoginContent() {
       }
     } else {
       setErrorMessage(res.message || "Invalid OTP entered. Please try again.");
+    }
+  };
+
+  // Process pending cart item selected before login
+  const processPendingCartItem = () => {
+    try {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("nexora-pending-cart-item");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.item) {
+            addToCart(parsed.item, parsed.quantity || 1);
+            localStorage.removeItem("nexora-pending-cart-item");
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not process pending cart item:", e);
     }
   };
 
@@ -127,6 +149,7 @@ function LoginContent() {
     setIsSubmitting(false);
 
     if (res.success) {
+      processPendingCartItem();
       setSuccessMessage("Profile personalized! Redirecting...");
       setTimeout(() => {
         router.push(redirectPath);

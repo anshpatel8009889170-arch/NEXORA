@@ -278,58 +278,56 @@ export default function CheckoutPage() {
       );
     }
 
-    // A. CASH ON DELIVERY (COD) FLOW
+    // A. CASH ON DELIVERY (COD) FLOW - Secure Server-Side Order Recalculation
     if (paymentMethod === "cod") {
       setIsProcessingPayment(true);
       try {
-        await supabase.from("orders").insert({
-          order_number: orderNum,
-          user_id: user?.id && !user.id.startsWith("user_") ? user.id : null,
-          customer_name: profile?.full_name || "Royal Guest",
-          customer_phone: user?.phone || profile?.phone || phoneInput,
-          delivery_type: "delivery",
-          delivery_address: fullAddress,
-          status: "pending",
-          payment_method: "cod",
-          payment_status: "pending",
-          subtotal: subtotal,
-          discount: discountAmount,
-          delivery_fee: deliveryFee,
-          tax: 0,
-          total_amount: grandTotal,
-          coupon_code: appliedCoupon ? appliedCoupon.code : null,
-          notes: appliedCoupon ? `Coupon: ${appliedCoupon.code}` : null,
+        const checkoutRes = await fetch("/api/orders/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderNumber: orderNum,
+            paymentMethod: "cod",
+            items: items.map((i) => ({ id: i.menuItem.id, quantity: i.quantity })),
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
+            customerName: profile?.full_name || "Royal Guest",
+            customerPhone: user?.phone || profile?.phone || phoneInput,
+            deliveryAddress: fullAddress,
+          }),
         });
-      } catch (err) {
-        console.warn("Supabase order recording notice:", err);
+
+        const data = await checkoutRes.json();
+        if (!data.success) {
+          throw new Error(data.error || "Failed to place order.");
+        }
+
+        setIsOrderPaid(false);
+        setPlacedOrderNumber(data.orderNumber || orderNum);
+        clearCart();
+      } catch (err: any) {
+        setPaymentError(err.message || "Failed to record your order.");
       } finally {
         setIsProcessingPayment(false);
-        setIsOrderPaid(false);
-        setPlacedOrderNumber(orderNum);
-        clearCart();
       }
       return;
     }
 
-    // B. ONLINE PAYMENT (RAZORPAY) FLOW
-    // Flow: Create Order -> Payment Gateway -> Customer Payment -> Backend Verification -> Database Order = PAID
+    // B. ONLINE PAYMENT (RAZORPAY) FLOW - Secure Server-Side Pricing Recalculation
     setIsProcessingPayment(true);
 
     try {
-      // Step 1: Create Order on Backend
-      const createOrderRes = await fetch("/api/payment/create-order", {
+      // Step 1: Create Order on Backend with Server Recalculation
+      const createOrderRes = await fetch("/api/orders/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderNumber: orderNum,
-          amount: grandTotal,
+          paymentMethod,
+          items: items.map((i) => ({ id: i.menuItem.id, quantity: i.quantity })),
+          couponCode: appliedCoupon ? appliedCoupon.code : null,
           customerName: profile?.full_name || "Royal Guest",
           customerPhone: user?.phone || profile?.phone || phoneInput,
           deliveryAddress: fullAddress,
-          subtotal,
-          deliveryFee,
-          discountAmount,
-          couponCode: appliedCoupon ? appliedCoupon.code : null,
         }),
       });
 
@@ -338,15 +336,21 @@ export default function CheckoutPage() {
         throw new Error(orderData.error || "Failed to create payment order");
       }
 
+      const activeOrderNum = orderData.orderNumber || orderNum;
+      const finalAmount = orderData.amount || grandTotal;
+
       // Check if real Razorpay key is present or in sandbox test mode
-      const isDemoMode = orderData.keyId === "rzp_test_nexora_demo" || orderData.razorpayOrderId.startsWith("order_demo_");
+      const isDemoMode =
+        orderData.keyId === "rzp_test_demo" ||
+        orderData.keyId === "rzp_test_nexora_demo" ||
+        (orderData.orderId && orderData.orderId.startsWith("order_demo_"));
 
       if (isDemoMode) {
         // Show interactive Sandbox Gateway Modal for instant verification testing
         setSandboxPayload({
-          orderNumber: orderNum,
-          razorpayOrderId: orderData.razorpayOrderId,
-          amount: grandTotal,
+          orderNumber: activeOrderNum,
+          razorpayOrderId: orderData.orderId,
+          amount: finalAmount,
         });
         setShowSandboxModal(true);
         setIsProcessingPayment(false);

@@ -28,6 +28,7 @@ import { formatCurrency } from "@/utils/formatters";
 import { Review } from "@/types/database";
 import ReviewModal from "@/components/ReviewModal";
 import AddressMapPicker from "@/components/AddressMapPicker";
+import { supabase } from "@/lib/supabase/client";
 
 type TabType = "orders" | "addresses" | "profile" | "reviews";
 
@@ -77,103 +78,99 @@ function AccountContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Orders State (Includes #1048 per Phase 15 specification)
-  const [orders, setOrders] = useState<AccountOrder[]>([
-    {
-      orderNumber: "1048",
-      items: ["Truffle Malai Paneer Tikka × 1", "NEXORA Royal Dal Bukhara × 1"],
-      total: 787,
-      status: "Delivered",
-      date: "Today, 1:45 PM",
-    },
-    {
-      orderNumber: "1024",
-      items: ["Burrata & Truffle Funghi Pizza × 1"],
-      total: 610,
-      status: "Delivered",
-      date: "Yesterday",
-    },
-  ]);
+  // Orders State (loaded dynamically from database/session)
+  const [orders, setOrders] = useState<AccountOrder[]>([]);
 
   // Customer Reviews State (Phase 25)
-  const [userReviews, setUserReviews] = useState<Review[]>([
-    {
-      id: "usr_rev_1",
-      customer_name: "Ansh Patel",
-      dish_name: "Truffle Malai Paneer Tikka",
-      rating: 5,
-      comment: "The clay oven smoked aroma and cashew marinade was absolutely exquisite.",
-      is_approved: true,
-      created_at: "2026-10-09T18:30:00.000Z",
-    },
-    {
-      id: "usr_rev_2",
-      customer_name: "Ansh Patel",
-      dish_name: "NEXORA Royal Dal Bukhara",
-      rating: 5,
-      comment: "Slow cooked overnight perfection. Authentic royal flavors!",
-      is_approved: true,
-      created_at: "2026-10-09T20:45:00.000Z",
-    },
-  ]);
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
   const [isAccountReviewModalOpen, setIsAccountReviewModalOpen] = useState(false);
   const [reviewTargetDish, setReviewTargetDish] = useState("");
   const [reviewTargetOrder, setReviewTargetOrder] = useState("");
 
-  // Load last order if available in localStorage
+  // Sync profile, orders, and reviews from database
   useEffect(() => {
     if (profile?.full_name) {
       setNameInput(profile.full_name);
     } else {
-      setNameInput("Ansh");
+      setNameInput("");
+    }
+
+    if (!isLoggedIn) {
+      setOrders([]);
+      setUserReviews([]);
+      return;
     }
 
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("nexora_last_order");
-      if (stored) {
+      // 1. Fetch user's genuine orders from Supabase database
+      async function fetchCustomerOrders() {
         try {
-          const parsed = JSON.parse(stored);
-          const shortNum = parsed.orderNumber?.replace(/^ORD-/, "") || "1049";
-          setOrders((prev) => {
-            if (prev.some((o) => o.orderNumber === shortNum)) return prev;
-            return [
+          let query = supabase.from("orders").select("*").order("created_at", { ascending: false });
+          if (user?.id && !user.id.startsWith("user_")) {
+            query = query.eq("user_id", user.id);
+          } else if (user?.phone || profile?.phone) {
+            query = query.eq("customer_phone", user?.phone || profile?.phone);
+          }
+          const { data, error } = await query;
+          if (!error && Array.isArray(data) && data.length > 0) {
+            const mapped: AccountOrder[] = data.map((o) => ({
+              orderNumber: o.order_number?.replace(/^ORD-/, "") || o.id,
+              items: Array.isArray(o.items)
+                ? o.items.map((it: any) => `${it.name || "Delicacy"} × ${it.quantity || 1}`)
+                : ["Royal Banquet Gourmet Delicacy"],
+              total: o.total_amount || o.total || 0,
+              status: (o.status ? (o.status.charAt(0).toUpperCase() + o.status.slice(1).replace(/_/g, " ")) : "Pending") as any,
+              date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric" }) : "Recent",
+            }));
+            setOrders(mapped);
+            return;
+          }
+        } catch {}
+
+        // Fallback to locally stored recent order in this browser session
+        const stored = localStorage.getItem("nexora_last_order");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            const shortNum = parsed.orderNumber?.replace(/^ORD-/, "") || "1049";
+            setOrders([
               {
                 orderNumber: shortNum,
                 items: parsed.items?.map((i: any) => `${i.name} × ${i.quantity}`) || [
                   "Gourmet Selection",
                 ],
-                total: parsed.total || 787,
+                total: parsed.total || 0,
                 status: "Preparing",
                 date: "Just now",
               },
-              ...prev,
-            ];
-          });
-        } catch {}
+            ]);
+          } catch {}
+        }
       }
 
-      // Sync reviews from API (Phase 25)
+      fetchCustomerOrders();
+
+      // 2. Sync genuine user reviews from API
       fetch("/api/reviews?all=true")
         .then((res) => res.json())
         .then((json) => {
           if (json.success && Array.isArray(json.reviews)) {
             const relevant = json.reviews.filter(
               (r: Review) =>
-                r.customer_name?.toLowerCase().includes("ansh") ||
-                (user?.id && r.user_id === user.id)
+                (user?.id && r.user_id === user.id) ||
+                (profile?.full_name && r.customer_name?.toLowerCase() === profile.full_name.toLowerCase())
             );
-            if (relevant.length > 0) {
-              setUserReviews(relevant);
-            }
+            setUserReviews(relevant);
           }
         })
         .catch(() => {});
     }
-  }, [profile, user]);
+  }, [profile, user, isLoggedIn]);
 
-  const customerName = profile?.full_name || (isLoggedIn ? "Ansh" : "Ansh");
-  const rawPhone = user?.phone || profile?.phone || "+91 98765 43210";
+  const customerName = profile?.full_name || (isLoggedIn ? "Valued Patron" : "Guest");
+  const rawPhone = user?.phone || profile?.phone || "";
   // Mask phone as requested: "+91 XXXXX XXXXX" or display formatted
-  const displayPhone = isLoggedIn
+  const displayPhone = isLoggedIn && rawPhone
     ? rawPhone
     : "+91 XXXXX XXXXX";
 
@@ -220,6 +217,55 @@ function AccountContent() {
     await signOut();
     router.push("/");
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // GUEST UNLOGGED VIEW (Secures customer account from unauthenticated access)
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col selection:bg-[#d4af37]/30 selection:text-white">
+        <main className="flex-1 pt-16 pb-24 px-4 sm:px-6 lg:px-8 max-w-lg mx-auto w-full flex items-center justify-center">
+          <div className="p-8 sm:p-10 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-2xl text-center space-y-6 gold-glow w-full">
+            <div className="w-16 h-16 mx-auto rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37]">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
+                Customer Authentication
+              </span>
+              <h1 className="text-2xl font-serif font-bold text-[var(--text-main)]">
+                Royal Guest Login Required
+              </h1>
+              <p className="text-xs text-[var(--text-sub)] max-w-sm mx-auto leading-relaxed">
+                Please verify your mobile number with OTP to access your previous dining orders, delivery addresses, and personalized banquet settings.
+              </p>
+            </div>
+            <div className="pt-2 space-y-3">
+              <Link
+                href="/login?redirect=/account"
+                className="w-full py-3.5 rounded-full text-xs font-semibold uppercase tracking-widest bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl font-bold"
+              >
+                <span>Sign In with OTP</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/menu"
+                className="inline-block text-xs text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
+              >
+                Browse Royal Menu
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col selection:bg-[#d4af37]/30 selection:text-white">
@@ -377,82 +423,105 @@ function AccountContent() {
                 </div>
 
                 <div className="space-y-4">
-                  {orders.map((ord) => (
-                    <div
-                      key={ord.orderNumber}
-                      className="p-5 sm:p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md hover:border-[#d4af37]/50 transition-all space-y-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          {/* #1048 */}
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-lg text-[var(--text-main)]">
-                              #{ord.orderNumber}
-                            </span>
-                            <span className="text-xs text-[var(--text-sub)]">
-                              • {ord.date}
-                            </span>
+                  {orders.length === 0 ? (
+                    <div className="py-12 px-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] text-center space-y-4">
+                      <div className="w-14 h-14 mx-auto rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37]">
+                        <UtensilsCrossed className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-base font-serif font-bold text-[var(--text-main)]">
+                          No Orders Yet
+                        </h4>
+                        <p className="text-xs text-[var(--text-sub)] max-w-xs mx-auto">
+                          You haven&apos;t placed any dining orders yet. Explore our handcrafted royal menu.
+                        </p>
+                      </div>
+                      <Link
+                        href="/menu"
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black font-bold shadow-md hover:opacity-90 active:scale-95 transition-all"
+                      >
+                        <span>Explore Royal Menu</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  ) : (
+                    orders.map((ord) => (
+                      <div
+                        key={ord.orderNumber}
+                        className="p-5 sm:p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-md hover:border-[#d4af37]/50 transition-all space-y-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            {/* Order Number */}
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-lg text-[var(--text-main)]">
+                                #{ord.orderNumber}
+                              </span>
+                              <span className="text-xs text-[var(--text-sub)]">
+                                • {ord.date}
+                              </span>
+                            </div>
+
+                            {/* Total Amount */}
+                            <p className="text-xl font-serif font-bold text-gold-gradient">
+                              {formatCurrency(ord.total)}
+                            </p>
                           </div>
 
-                          {/* ₹787 */}
-                          <p className="text-xl font-serif font-bold text-gold-gradient">
-                            {formatCurrency(ord.total)}
-                          </p>
-                        </div>
-
-                        {/* Delivered Badge */}
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                            ord.status === "Delivered"
-                              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                              : "bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30"
-                          }`}
-                        >
-                          {ord.status}
-                        </span>
-                      </div>
-
-                      {/* Items Preview */}
-                      <p className="text-xs text-[var(--text-sub)] line-clamp-1">
-                        {ord.items.join(", ")}
-                      </p>
-
-                      {/* Action Buttons: [View Details], [Rate Order] and Reorder */}
-                      <div className="pt-2 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/track-order?orderId=ORD-${ord.orderNumber}`}
-                            className="px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[var(--section-alt)] text-[#d4af37] border border-[#d4af37]/40 hover:bg-gold-gradient hover:text-black hover:border-transparent active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+                          {/* Status Badge */}
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                              ord.status === "Delivered"
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                : "bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30"
+                            }`}
                           >
-                            <span>View Details</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
-
-                          {ord.status === "Delivered" && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReviewTargetOrder(`ORD-${ord.orderNumber}`);
-                                setReviewTargetDish(ord.items[0]?.split(" ×")[0] || "");
-                                setIsAccountReviewModalOpen(true);
-                              }}
-                              className="px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/30 hover:bg-[#d4af37] hover:text-black active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <Star className="w-3 h-3 fill-current" />
-                              <span>Rate Order</span>
-                            </button>
-                          )}
+                            {ord.status}
+                          </span>
                         </div>
 
-                        <Link
-                          href="/menu"
-                          className="text-xs text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
-                        >
-                          Reorder Items
-                        </Link>
+                        {/* Items Preview */}
+                        <p className="text-xs text-[var(--text-sub)] line-clamp-1">
+                          {ord.items.join(", ")}
+                        </p>
+
+                        {/* Action Buttons: [View Details], [Rate Order] and Reorder */}
+                        <div className="pt-2 border-t border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/track-order?orderId=ORD-${ord.orderNumber}`}
+                              className="px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[var(--section-alt)] text-[#d4af37] border border-[#d4af37]/40 hover:bg-gold-gradient hover:text-black hover:border-transparent active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+                            >
+                              <span>View Details</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </Link>
+
+                            {ord.status === "Delivered" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReviewTargetOrder(`ORD-${ord.orderNumber}`);
+                                  setReviewTargetDish(ord.items[0]?.split(" ×")[0] || "");
+                                  setIsAccountReviewModalOpen(true);
+                                }}
+                                className="px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-[#d4af37]/10 text-[#d4af37] border border-[#d4af37]/30 hover:bg-[#d4af37] hover:text-black active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Star className="w-3 h-3 fill-current" />
+                                <span>Rate Order</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <Link
+                            href="/menu"
+                            className="text-xs text-[var(--text-sub)] hover:text-[#d4af37] transition-colors"
+                          >
+                            Reorder Items
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}

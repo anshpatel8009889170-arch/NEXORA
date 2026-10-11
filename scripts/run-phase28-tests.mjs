@@ -1056,6 +1056,97 @@ async function runSecurityTests() {
   } catch (err) {
     recordResult("Security", "Business data integrity & authentic metrics (Kami 8) ✔", false, err.message);
   }
+
+  // --------------------------------------------------------------------------
+  // TEST: Customer auth, server-side price recalculation & state integrity (Kami 9)
+  // --------------------------------------------------------------------------
+  try {
+    // 1. Session verification: Unauthenticated session probe returns authenticated: false
+    const unauthSessionRes = await fetch(`${BASE_URL}/api/auth/session`);
+    assert.strictEqual(unauthSessionRes.status, 200, "Session endpoint must respond with 200");
+    const sessionData = await unauthSessionRes.json();
+    assert.strictEqual(sessionData.success, true);
+    assert.strictEqual(sessionData.authenticated, false, "Must report authenticated: false when unauthenticated");
+    assert.strictEqual(sessionData.user, null, "User must be null when unauthenticated");
+
+    // 2. OTP format validation: Non-6-digit tokens rejected with HTTP 400
+    const invalidOtpRes = await fetch(`${BASE_URL}/api/auth/otp/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: "+91 83038 90056", token: "123" }),
+    });
+    assert.strictEqual(invalidOtpRes.status, 400, "Non-6-digit OTP tokens must be rejected with HTTP 400");
+    const invalidOtpData = await invalidOtpRes.json();
+    assert.strictEqual(invalidOtpData.success, false);
+    assert.ok(invalidOtpData.error.includes("6-digit"), "Error message must state 6-digit requirement");
+
+    // 3. Price tampering defense on Checkout (/api/orders/checkout):
+    // Caller submits tampered price (1), tampered amount (1), tampered paymentStatus ('paid'), and tampered isAdmin (true)
+    const tamperedCheckoutRes = await fetch(`${BASE_URL}/api/orders/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerName: "Security Audit User",
+        phone: "+91 83038 90056",
+        address: "Sathigva, Amauli-Fatehpur Road, 212631",
+        paymentMethod: "COD",
+        amount: 1, // Malicious tampered client amount
+        items: [
+          { id: "item-chinese-1", name: "Hakka Noodles", price: 1, quantity: 2 }, // Hakka Noodles genuine price is 280
+        ],
+        paymentStatus: "paid", // Malicious tampered payment status
+        isAdmin: true, // Malicious privilege escalation attempt
+      }),
+    });
+    assert.strictEqual(tamperedCheckoutRes.status, 200, "Checkout should complete with recalculated values");
+    const checkoutData = await tamperedCheckoutRes.json();
+    assert.strictEqual(checkoutData.success, true);
+    // Subtotal: 280 * 2 = 560. Delivery Fee: 40. Grand total: 600.
+    assert.strictEqual(checkoutData.calculated.subtotal, 560, "Server must compute authoritative subtotal (560)");
+    assert.strictEqual(checkoutData.calculated.deliveryFee, 40, "Delivery fee must be calculated server-side (40)");
+    assert.strictEqual(checkoutData.amount, 600, "Client tampered amount of ₹1 must be completely discarded in favor of ₹600");
+    assert.strictEqual(checkoutData.paymentMethod, "cod");
+
+    // 4. Price tampering defense on Payment Order Creation (/api/payment/create-order):
+    // Caller attempts to generate Razorpay order for ₹1 when items subtotal is ₹560 + delivery
+    const tamperedPaymentRes = await fetch(`${BASE_URL}/api/payment/create-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: 1, // Malicious client amount
+        currency: "INR",
+        items: [
+          { id: "item-chinese-1", name: "Hakka Noodles", price: 1, quantity: 2 },
+        ],
+      }),
+    });
+    assert.strictEqual(tamperedPaymentRes.status, 200, "Create payment order should respond 200");
+    const paymentData = await tamperedPaymentRes.json();
+    assert.strictEqual(paymentData.success, true);
+    assert.strictEqual(paymentData.amount, 600, "Server must override client amount with ₹600");
+    assert.strictEqual(paymentData.amountInPaise, 60000, "Paise amount must equal 60000 paise (not 100 paise)");
+
+    // 5. Checkout input validation: Empty items rejected with HTTP 400
+    const emptyCheckoutRes = await fetch(`${BASE_URL}/api/orders/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerName: "Test User",
+        phone: "+91 83038 90056",
+        items: [],
+      }),
+    });
+    assert.strictEqual(emptyCheckoutRes.status, 400, "Empty items list must be rejected with 400");
+
+    recordResult(
+      "Security",
+      "Customer auth & server price recalculation (Kami 9) ✔",
+      true,
+      "Server session verification, 6-digit OTP enforcement, client price tampering discarded & DB recalculation verified"
+    );
+  } catch (err) {
+    recordResult("Security", "Customer auth & server price recalculation (Kami 9) ✔", false, err.message);
+  }
 }
 
 

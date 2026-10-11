@@ -29,15 +29,38 @@ export async function POST(req: Request) {
       deliveryFee,
       discountAmount,
       couponCode,
+      items,
     } = body;
 
-    // 2. Strict Input Validation & Sanitization
-    const validAmountResult = validateAmount(amount, 1, 150000);
-    if (!validAmountResult.isValid) {
-      return NextResponse.json(
-        { error: "Invalid order amount. Must be a valid positive amount." },
-        { status: 400 }
-      );
+    // 2. Server-side price recalculation or input validation
+    let finalAmount = 0;
+    let finalSubtotal = 0;
+    let finalDeliveryFee = 0;
+    let finalDiscount = 0;
+    let finalCoupon: string | null = sanitizeCouponCode(couponCode) || null;
+
+    if (Array.isArray(items) && items.length > 0) {
+      // Re-fetch prices from database & recalculate on server
+      const { recalculateOrderFromDatabase } = await import("@/lib/orders/orderCalculator");
+      const recalculated = await recalculateOrderFromDatabase(items, couponCode);
+      finalAmount = recalculated.grandTotal;
+      finalSubtotal = recalculated.subtotal;
+      finalDeliveryFee = recalculated.deliveryFee;
+      finalDiscount = recalculated.discountAmount;
+      finalCoupon = recalculated.couponCode;
+    } else {
+      // Validate direct amount (for test suite or custom payment flows)
+      const validAmountResult = validateAmount(amount, 1, 150000);
+      if (!validAmountResult.isValid) {
+        return NextResponse.json(
+          { error: "Invalid order amount. Must be a valid positive amount." },
+          { status: 400 }
+        );
+      }
+      finalAmount = validAmountResult.value;
+      finalSubtotal = validateAmount(subtotal, 0, 150000).value || finalAmount;
+      finalDeliveryFee = validateAmount(deliveryFee, 0, 1000).value || 0;
+      finalDiscount = validateAmount(discountAmount, 0, 10000).value || 0;
     }
 
     const safeOrderNumber = sanitizeString(orderNumber, 60) || `ORD-${Date.now()}`;
@@ -45,13 +68,8 @@ export async function POST(req: Request) {
     const phoneResult = validatePhone(customerPhone || "");
     const safePhone = phoneResult.isValid ? phoneResult.sanitized : sanitizeString(customerPhone, 20);
     const safeAddress = sanitizeString(deliveryAddress, 300) || "N/A";
-    const safeCoupon = sanitizeCouponCode(couponCode);
 
-    const validSubtotal = validateAmount(subtotal, 0, 150000).value || validAmountResult.value;
-    const validDeliveryFee = validateAmount(deliveryFee, 0, 1000).value || 0;
-    const validDiscount = validateAmount(discountAmount, 0, 10000).value || 0;
-
-    const amountInPaise = Math.round(validAmountResult.value * 100);
+    const amountInPaise = Math.round(finalAmount * 100);
     const razorpay = getRazorpayClient();
     let razorpayOrderId = "";
 
@@ -64,7 +82,7 @@ export async function POST(req: Request) {
         notes: {
           customerName: safeCustomerName,
           customerPhone: safePhone,
-          couponCode: safeCoupon || "None",
+          couponCode: finalCoupon || "None",
         },
       });
       razorpayOrderId = rzpOrder.id;
@@ -85,13 +103,13 @@ export async function POST(req: Request) {
         status: "pending",
         payment_method: "online",
         payment_status: "pending",
-        subtotal: validSubtotal,
-        discount: validDiscount,
-        delivery_fee: validDeliveryFee,
+        subtotal: finalSubtotal,
+        discount: finalDiscount,
+        delivery_fee: finalDeliveryFee,
         tax: 0,
-        total_amount: validAmountResult.value,
-        total: validAmountResult.value,
-        notes: `Razorpay Order initiated: ${razorpayOrderId}${safeCoupon ? ` (Coupon: ${safeCoupon})` : ""}`,
+        total_amount: finalAmount,
+        total: finalAmount,
+        notes: `Razorpay Order initiated: ${razorpayOrderId}${finalCoupon ? ` (Coupon: ${finalCoupon})` : ""}`,
       });
     } catch (dbErr) {
       console.warn("DB insert pending order warning:", dbErr);
@@ -100,7 +118,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       orderId: razorpayOrderId,
-      amount: validAmountResult.value,
+      amount: finalAmount,
       amountInPaise,
       currency: "INR",
       orderNumber: safeOrderNumber,

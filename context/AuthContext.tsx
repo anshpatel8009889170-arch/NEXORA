@@ -120,33 +120,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSelectedAddressId(cachedSelectedAddressId);
         }
 
-        // 2. Synchronize with Supabase Auth session
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        // 2. Synchronize with Server-Side Session Verification & Supabase Auth
+        let serverAuthenticated = false;
+        try {
+          const sessionRes = await fetch("/api/auth/session");
+          if (sessionRes.ok) {
+            const sessionData = await sessionRes.json();
+            if (sessionData.authenticated && sessionData.user) {
+              const u: AuthUser = {
+                id: sessionData.user.id,
+                phone: sessionData.user.phone,
+              };
+              setUser(u);
+              localStorage.setItem("nexora-user", JSON.stringify(u));
 
-        if (session?.user) {
-          const u: AuthUser = {
-            id: session.user.id,
-            phone: session.user.phone,
-            email: session.user.email,
-          };
-          setUser(u);
-          localStorage.setItem("nexora-user", JSON.stringify(u));
-
-          // Fetch profile from database
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle();
-
-          if (profileData) {
-            setProfile(profileData as Profile);
-            localStorage.setItem("nexora-profile", JSON.stringify(profileData));
-            if (profileData.address) {
-              setDeliveryAddress(profileData.address as unknown as DeliveryAddressData);
+              const serverProfile: Profile = {
+                id: sessionData.user.id,
+                full_name: sessionData.user.name || "",
+                phone: sessionData.user.phone,
+                role: "customer",
+                created_at: new Date().toISOString(),
+              };
+              setProfile(serverProfile);
+              localStorage.setItem("nexora-profile", JSON.stringify(serverProfile));
+              serverAuthenticated = true;
             }
+          }
+        } catch {}
+
+        // 3. Fallback check with Supabase Auth session if server cookie wasn't set yet
+        if (!serverAuthenticated) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (session?.user) {
+            const u: AuthUser = {
+              id: session.user.id,
+              phone: session.user.phone,
+              email: session.user.email,
+            };
+            setUser(u);
+            localStorage.setItem("nexora-user", JSON.stringify(u));
+
+            // Fetch profile from database
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle();
+
+            if (profileData) {
+              setProfile(profileData as Profile);
+              localStorage.setItem("nexora-profile", JSON.stringify(profileData));
+              if (profileData.address) {
+                setDeliveryAddress(profileData.address as unknown as DeliveryAddressData);
+              }
+            }
+          } else if (cachedUser) {
+            // Neither server session nor Supabase session exists — purge unverified local storage
+            localStorage.removeItem("nexora-user");
+            localStorage.removeItem("nexora-profile");
+            setUser(null);
+            setProfile(null);
           }
         }
       } catch (err) {
@@ -236,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Send OTP to phone
+  // Send OTP to phone via Server API & Supabase Auth
   const sendOtp = async (phoneNumber: string): Promise<{ success: boolean; message?: string; mockOtp?: string }> => {
     const cleaned = phoneNumber.replace(/\D/g, "");
     if (cleaned.length < 10) {
@@ -246,24 +282,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const formattedPhone = cleaned.length === 10 ? `+91${cleaned}` : `+${cleaned}`;
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
+      // Call Server-Side OTP Endpoint
+      const res = await fetch("/api/auth/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formattedPhone }),
       });
 
-      if (error) {
-        console.warn("Supabase SMS provider notice:", error.message);
+      const data = await res.json();
+      if (res.ok && data.success) {
         return {
           success: true,
-          message: "Verification code generated! (Use demo code 123456)",
-          mockOtp: "123456",
+          message: data.message || `OTP sent to ${formattedPhone}`,
+          mockOtp: data.isSandbox ? "123456" : undefined,
         };
       }
 
       return {
-        success: true,
-        message: `OTP sent to ${formattedPhone}`,
+        success: false,
+        message: data.error || "Failed to dispatch verification code.",
       };
     } catch {
+      // Client-side fallback to Supabase SDK
+      try {
+        const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
+        if (!error) {
+          return { success: true, message: `OTP sent to ${formattedPhone}` };
+        }
+      } catch {}
+
       return {
         success: true,
         message: "Verification code generated! (Use demo code 123456)",
@@ -272,19 +319,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Verify OTP
+  // Verify OTP via Server API & Supabase Auth
   const verifyOtp = async (
     phoneNumber: string,
     token: string
   ): Promise<{ success: boolean; message?: string; isNewUser?: boolean }> => {
     const cleaned = phoneNumber.replace(/\D/g, "");
     const formattedPhone = cleaned.length === 10 ? `+91${cleaned}` : `+${cleaned}`;
+    const cleanToken = token.trim();
 
     try {
-      // 1. Attempt Supabase Auth verify
+      // 1. Call Server-Side OTP Verification Endpoint
+      const verifyRes = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formattedPhone, token: cleanToken }),
+      });
+
+      const verifyData = await verifyRes.json();
+
+      if (verifyRes.ok && verifyData.success) {
+        const authUser: AuthUser = {
+          id: verifyData.user.id,
+          phone: verifyData.user.phone,
+        };
+        setUser(authUser);
+        localStorage.setItem("nexora-user", JSON.stringify(authUser));
+
+        const userProfile: Profile = {
+          id: verifyData.user.id,
+          full_name: verifyData.user.name || "",
+          phone: verifyData.user.phone,
+          role: "customer",
+          created_at: new Date().toISOString(),
+        };
+        setProfile(userProfile);
+        localStorage.setItem("nexora-profile", JSON.stringify(userProfile));
+
+        return { success: true, isNewUser: verifyData.isNewUser };
+      }
+
+      // If server returned an explicit error (e.g. invalid OTP)
+      if (!verifyRes.ok && verifyData.error) {
+        return { success: false, message: verifyData.error };
+      }
+
+      // 2. Direct Supabase Auth SDK fallback
       const { data, error } = await supabase.auth.verifyOtp({
         phone: formattedPhone,
-        token: token.trim(),
+        token: cleanToken,
         type: "sms",
       });
 
@@ -302,77 +385,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq("id", data.user.id)
           .maybeSingle();
 
-        if (existingProfile && existingProfile.full_name && existingProfile.full_name !== "Guest") {
-          setProfile(existingProfile as Profile);
-          localStorage.setItem("nexora-profile", JSON.stringify(existingProfile));
-          return { success: true, isNewUser: false };
-        } else {
-          const newProfile: Profile = {
-            id: data.user.id,
-            full_name: "",
-            phone: formattedPhone,
-            role: "customer",
-            created_at: new Date().toISOString(),
-          };
-          setProfile(newProfile);
-          localStorage.setItem("nexora-profile", JSON.stringify(newProfile));
-          return { success: true, isNewUser: true };
-        }
-      }
-
-      // 2. Demo OTP fallback verification for development
-      if (token.trim() === "123456" || token.trim() === "000000") {
-        const fallbackId = `user_${cleaned}`;
-        const authUser: AuthUser = {
-          id: fallbackId,
-          phone: formattedPhone,
-        };
-        setUser(authUser);
-        localStorage.setItem("nexora-user", JSON.stringify(authUser));
-
-        const cachedProfile = localStorage.getItem(`nexora-profile-${cleaned}`);
-        if (cachedProfile) {
-          const parsed = JSON.parse(cachedProfile);
-          setProfile(parsed);
-          localStorage.setItem("nexora-profile", JSON.stringify(parsed));
-          return { success: true, isNewUser: !parsed.full_name };
-        }
-
-        const newProfile: Profile = {
-          id: fallbackId,
-          full_name: "",
+        const pName = existingProfile?.full_name && existingProfile.full_name !== "Guest" ? existingProfile.full_name : "";
+        const fallbackProfile: Profile = {
+          id: data.user.id,
+          full_name: pName,
           phone: formattedPhone,
           role: "customer",
           created_at: new Date().toISOString(),
         };
-        setProfile(newProfile);
-        localStorage.setItem("nexora-profile", JSON.stringify(newProfile));
-        return { success: true, isNewUser: true };
+        setProfile(fallbackProfile);
+        localStorage.setItem("nexora-profile", JSON.stringify(fallbackProfile));
+
+        // Sync with server session
+        try {
+          await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: data.user.id, phone: formattedPhone, name: pName }),
+          });
+        } catch {}
+
+        return { success: true, isNewUser: !pName };
       }
 
       return {
         success: false,
-        message: error?.message || "Invalid OTP entered. Please try again or use 123456.",
+        message: error?.message || "Invalid OTP entered. Please try again.",
       };
     } catch (err: unknown) {
-      if (token.trim() === "123456") {
-        const fallbackId = `user_${cleaned}`;
-        const authUser: AuthUser = { id: fallbackId, phone: formattedPhone };
-        setUser(authUser);
-        localStorage.setItem("nexora-user", JSON.stringify(authUser));
-
-        const newProfile: Profile = {
-          id: fallbackId,
-          full_name: "",
-          phone: formattedPhone,
-          role: "customer",
-          created_at: new Date().toISOString(),
-        };
-        setProfile(newProfile);
-        localStorage.setItem("nexora-profile", JSON.stringify(newProfile));
-        return { success: true, isNewUser: true };
-      }
-
       const errorMessage = err instanceof Error ? err.message : "Verification failed.";
       return { success: false, message: errorMessage };
     }
@@ -446,6 +486,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sign Out
   const signOut = async () => {
+    try {
+      await fetch("/api/auth/session", { method: "DELETE" });
+    } catch {}
     try {
       await supabase.auth.signOut();
     } catch {}
