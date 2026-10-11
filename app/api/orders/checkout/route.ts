@@ -6,6 +6,7 @@ import { sanitizeString, validatePhone } from "@/lib/security/validation";
 import { recalculateOrderFromDatabase } from "@/lib/orders/orderCalculator";
 import { getCustomerSessionFromRequest } from "@/lib/security/customerAuth";
 import { saveRuntimeOrder } from "@/lib/ordersStore";
+import { initiatePhonePePayment } from "@/lib/phonepe";
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,11 +63,33 @@ export async function POST(req: NextRequest) {
     const customerSession = await getCustomerSessionFromRequest(req);
     const userId = customerSession?.id || null;
 
-    // 6. Handle Online Payment Gateway (Razorpay)
+    // 6. Handle Online Payment Gateway (PhonePe PG + Razorpay fallback)
     let razorpayOrderId: string | null = null;
+    let phonePeRedirectUrl: string | null = null;
+    let merchantTransactionId: string | null = null;
     const amountInPaise = Math.round(recalculated.grandTotal * 100);
 
     if (isOnlinePayment) {
+      // Primary: PhonePe Payment Gateway (Swiggy / Zomato UPI Intent Flow)
+      try {
+        const origin = req.nextUrl.origin || "http://localhost:3000";
+        const phonePeResult = await initiatePhonePePayment({
+          orderNumber: safeOrderNumber,
+          amount: recalculated.grandTotal,
+          customerPhone: safePhone,
+          customerName: safeCustomerName,
+          redirectUrl: `${origin}/payment/status?orderNumber=${safeOrderNumber}`,
+          callbackUrl: `${origin}/api/payment/phonepe/webhook`,
+        });
+        if (phonePeResult.success) {
+          phonePeRedirectUrl = phonePeResult.redirectUrl || null;
+          merchantTransactionId = phonePeResult.merchantTransactionId || null;
+        }
+      } catch (peErr) {
+        console.warn("PhonePe initiation notice:", peErr);
+      }
+
+      // Secondary / Fallback: Razorpay
       const razorpay = getRazorpayClient();
       if (razorpay) {
         const rzpOrder = await razorpay.orders.create({
@@ -82,7 +105,6 @@ export async function POST(req: NextRequest) {
         });
         razorpayOrderId = rzpOrder.id;
       } else {
-        // Deterministic sandbox order id
         razorpayOrderId = `order_demo_${Date.now()}`;
       }
     }
@@ -181,6 +203,9 @@ export async function POST(req: NextRequest) {
         success: true,
         orderNumber: safeOrderNumber,
         paymentMethod: "online",
+        provider: "phonepe",
+        redirectUrl: phonePeRedirectUrl,
+        merchantTransactionId,
         orderId: razorpayOrderId,
         amount: recalculated.grandTotal,
         amountInPaise,

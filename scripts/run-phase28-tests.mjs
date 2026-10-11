@@ -449,6 +449,56 @@ async function runCustomerTests() {
     recordResult("Customer", "Payment", false, err.message);
   }
 
+  // 1.10.1 PhonePe PG Payment Order Creation & Recalculation API
+  let createdPhonePeTxnId = null;
+  const phonePeOrderNum = `ORD-PHONEPE-${Date.now()}`;
+  try {
+    const res = await fetch(`${BASE_URL}/api/payment/phonepe/create-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderNumber: phonePeOrderNum,
+        customerName: "Vaibhav Patel",
+        customerPhone: "+91 83038 90056",
+        deliveryAddress: "Sathigva, Amauli-Fatehpur Road, 212631",
+        items: [
+          { id: "item-chinese-1", quantity: 2 },
+        ],
+      }),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true, "PhonePe order creation should return success: true");
+    assert.strictEqual(data.provider, "phonepe", "Provider must be phonepe");
+    assert.ok(data.merchantTransactionId, "Should return merchantTransactionId");
+    assert.ok(data.redirectUrl, "Should return redirectUrl");
+    assert.strictEqual(data.amount, 600, "Should recalculate Hakka Noodles (280*2 = 560 + 40 delivery = 600)");
+    createdPhonePeTxnId = data.merchantTransactionId;
+    recordResult("Customer", "PhonePe payment initiation", true, `PhonePe order generated: ${createdPhonePeTxnId} (₹600) with redirect URL`);
+  } catch (err) {
+    recordResult("Customer", "PhonePe payment initiation", false, err.message);
+  }
+
+  // 1.10.2 PhonePe PG Payment Status Verification API
+  try {
+    const res = await fetch(`${BASE_URL}/api/payment/phonepe/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderNumber: phonePeOrderNum,
+        transactionId: createdPhonePeTxnId || "MT_MOCK_123",
+      }),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true, "Status query should succeed");
+    assert.strictEqual(data.verified, true, "Payment should be verified");
+    assert.strictEqual(data.code, "PAYMENT_SUCCESS", "Code should be PAYMENT_SUCCESS");
+    recordResult("Customer", "PhonePe payment verification", true, `Transaction ${createdPhonePeTxnId} verified and order marked paid`);
+  } catch (err) {
+    recordResult("Customer", "PhonePe payment verification", false, err.message);
+  }
+
   // 1.11 Order Placement Model
   const orderNumber = `NEX-1048`;
   try {
