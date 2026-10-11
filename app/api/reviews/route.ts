@@ -280,7 +280,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update in Supabase
     try {
-      const supabase = createServerClient();
+      const supabase = createServerClient({ admin: true });
       const { data, error } = await supabase
         .from("reviews")
         .update({ is_approved })
@@ -353,7 +353,7 @@ export async function DELETE(request: NextRequest) {
 
     // Remove in Supabase
     try {
-      const supabase = createServerClient();
+      const supabase = createServerClient({ admin: true });
       await supabase.from("reviews").delete().eq("id", id);
     } catch (dbErr) {
       console.warn("DB delete review fallback:", dbErr);

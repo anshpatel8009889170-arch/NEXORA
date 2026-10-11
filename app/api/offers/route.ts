@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     const validMinOrder = validateAmount(minimum_order, 0, 50000).value;
     const validMaxDiscount = max_discount ? validateAmount(max_discount, 0, 50000).value : null;
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
 
     const offerPayload: any = {
       code: cleanCode,
@@ -208,7 +208,7 @@ export async function PATCH(request: NextRequest) {
 
     toggleRuntimeOffer(cleanCode, Boolean(is_active));
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
 
     const { error } = await supabase
       .from("offers")
@@ -258,7 +258,7 @@ export async function DELETE(request: NextRequest) {
 
     deleteRuntimeOffer(cleanCode);
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
 
     const { error } = await supabase
       .from("offers")

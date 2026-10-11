@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     });
     if (rateLimitRes) return rateLimitRes;
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
     const { data: dbOrders, error } = await supabase
       .from("orders")
       .select("*")

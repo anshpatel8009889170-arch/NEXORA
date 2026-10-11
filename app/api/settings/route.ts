@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
     const { data, error } = await supabase
       .from("restaurant_settings")
       .upsert(payload, { onConflict: "id" })

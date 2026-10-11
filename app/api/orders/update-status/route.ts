@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Fetch the exact order by orderNumber
-    const supabase = createServerClient();
+    // 2. Fetch the exact order by orderNumber (Using trusted server client)
+    const supabase = createServerClient({ admin: true });
     let dbOrder: any = null;
     let dbFetchError: any = null;
 

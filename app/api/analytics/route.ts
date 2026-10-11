@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       return auth.response;
     }
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
 
     // Query orders from Supabase if present
     const { data: dbOrders, error } = await supabase

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     });
     if (rateLimitRes) return rateLimitRes;
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
     const { data: dbItems, error } = await supabase
       .from("menu_items")
       .select("*")
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     };
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
     const { data, error } = await supabase
       .from("menu_items")
       .upsert(newDish, { onConflict: "id" })
@@ -160,7 +160,7 @@ export async function PATCH(request: NextRequest) {
     if (body.category_id !== undefined) updates.category_id = sanitizeString(body.category_id, 80);
     if (body.image_url !== undefined) updates.image_url = sanitizeString(body.image_url, 300);
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
     const { data, error } = await supabase
       .from("menu_items")
       .update(updates)
@@ -216,7 +216,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
     const { error } = await supabase.from("menu_items").delete().eq("id", id);
 
     if (error) {

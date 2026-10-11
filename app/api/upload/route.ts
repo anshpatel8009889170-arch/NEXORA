@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     const uniqueFileId = crypto.randomUUID();
     const filePath = `dishes/${uniqueFileId}.${extension}`;
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ admin: true });
 
     // 6. Upload to Supabase Storage with strict failure handling
     const { data: uploadData, error: uploadError } = await supabase.storage

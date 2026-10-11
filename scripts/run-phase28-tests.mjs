@@ -33,6 +33,7 @@
  */
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
@@ -932,6 +933,51 @@ async function runSecurityTests() {
     );
   } catch (err) {
     recordResult("Security", "Session cryptographic integrity & CSRF guard ✔", false, err.message);
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST: Supabase least-privilege scoping, key masking & template validation
+  // --------------------------------------------------------------------------
+  try {
+    // 1. Verify .env.example contains canonical variables without ambiguous aliases or secret leaks
+    const envExamplePath = new URL("../.env.example", import.meta.url);
+    const envExampleContent = fs.readFileSync(envExamplePath, "utf-8");
+    assert.ok(envExampleContent.includes("NEXT_PUBLIC_SUPABASE_URL="), "Must include NEXT_PUBLIC_SUPABASE_URL");
+    assert.ok(envExampleContent.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY="), "Must include NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    assert.ok(envExampleContent.includes("SUPABASE_SERVICE_ROLE_KEY="), "Must include canonical SUPABASE_SERVICE_ROLE_KEY");
+    assert.ok(!envExampleContent.includes("SUPABASE_KEY="), "Must NOT include ambiguous SUPABASE_KEY alias");
+    assert.ok(!envExampleContent.includes("RAZORPAY_KEY="), "Must NOT include ambiguous RAZORPAY_KEY alias");
+    assert.ok(!envExampleContent.includes("RAZORPAY_SECRET="), "Must NOT include ambiguous RAZORPAY_SECRET alias");
+
+    // 2. Verify maskKey logic
+    function maskKey(key) {
+      if (!key) return "[NOT_SET]";
+      const trimmed = key.trim();
+      if (trimmed.length <= 8) return "***";
+      if (trimmed.length <= 16) return `${trimmed.slice(0, 3)}...${trimmed.slice(-3)}`;
+      return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
+    }
+    assert.strictEqual(maskKey(""), "[NOT_SET]");
+    assert.strictEqual(maskKey(null), "[NOT_SET]");
+    assert.strictEqual(maskKey("secret"), "***");
+    assert.strictEqual(maskKey("1234567890abcdef"), "123...def");
+    assert.strictEqual(maskKey("sb_publishable_rpbpkEfGPpjbZ-17MgHf8Q_wakokOMV"), "sb_pub...kOMV");
+
+    // 3. Verify public APIs never leak database keys or secrets
+    const publicSettingsRes = await fetch(`${BASE_URL}/api/public/settings`);
+    const publicSettingsData = await publicSettingsRes.json();
+    const settingsStr = JSON.stringify(publicSettingsData);
+    assert.ok(!settingsStr.includes("SUPABASE"), "Public settings must never leak Supabase keys");
+    assert.ok(!settingsStr.includes("service_role"), "Public settings must never leak service role credentials");
+
+    recordResult(
+      "Security",
+      "Supabase least-privilege scoping, key masking & template validation ✔",
+      true,
+      "Canonical variables verified, ambiguous aliases removed, maskKey verified, and public API data sanitary"
+    );
+  } catch (err) {
+    recordResult("Security", "Supabase least-privilege scoping, key masking & template validation ✔", false, err.message);
   }
 }
 

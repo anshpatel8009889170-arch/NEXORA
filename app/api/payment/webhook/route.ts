@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       // Update database order to paid
       if (receipt) {
         try {
-          const supabase = createServerClient();
+          const supabase = createServerClient({ admin: true });
           await supabase
             .from("orders")
             .update({
