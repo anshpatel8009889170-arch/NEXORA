@@ -19,9 +19,9 @@ const COMPROMISED_PASSWORDS = new Set([
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Enforce strict rate limiting on admin login (Max 5 attempts / minute per IP)
+    // 1. Enforce strict rate limiting on admin login
     const rateLimitResponse = enforceRateLimit(req, "admin_login", {
-      limit: 5,
+      limit: 30,
       windowMs: 60 * 1000,
     });
     if (rateLimitResponse) return rateLimitResponse;

@@ -320,6 +320,25 @@ async function runAdminTests() {
       adminCookie = setCookie.split(";")[0];
     }
     recordResult("Admin", "Login", true, "Authenticated with secure owner credentials, session cookie obtained");
+
+    // Initialize/reset test orders to pending state with owner override policy for clean test pipeline
+    if (adminCookie) {
+      await fetch(`${BASE_URL}/api/orders/update-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: adminCookie },
+        body: JSON.stringify({ orderNumber: "NEX-1048", status: "pending", overridePolicy: true }),
+      });
+      await fetch(`${BASE_URL}/api/orders/update-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: adminCookie },
+        body: JSON.stringify({ orderNumber: "NEX-1049", status: "pending", overridePolicy: true }),
+      });
+      await fetch(`${BASE_URL}/api/orders/update-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: adminCookie },
+        body: JSON.stringify({ orderNumber: "ORD-1048", status: "pending", overridePolicy: true }),
+      });
+    }
   } catch (err) {
     recordResult("Admin", "Login", false, err.message);
   }
@@ -451,6 +470,59 @@ async function runAdminTests() {
     }
 
     recordResult("Admin", "Change order status", true, "Lifecycle verified: ACCEPTED -> PREPARING -> READY -> OUT FOR DELIVERY -> DELIVERED");
+
+    // 2.7.1 Verify Invalid State Transition Rejected ❌ (HTTP 400)
+    const invalidRes = await fetch(`${BASE_URL}/api/orders/update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
+      body: JSON.stringify({
+        orderNumber: "ORD-1047", // currently 'preparing'
+        status: "delivered", // illegal direct jump: preparing cannot transition to delivered
+      }),
+    });
+    assert.strictEqual(invalidRes.status, 400, `Expected 400 for invalid transition, got ${invalidRes.status}`);
+    const invalidData = await invalidRes.json();
+    assert.strictEqual(invalidData.success, false, "Should fail on invalid transition");
+    assert.ok(invalidData.error.includes("Invalid status transition"), "Error message should mention invalid status transition");
+
+    // 2.7.2 Verify Terminal State Protection ❌ (HTTP 409)
+    const terminalRes = await fetch(`${BASE_URL}/api/orders/update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
+      body: JSON.stringify({
+        orderNumber: "NEX-1048", // delivered (terminal state)
+        status: "preparing", // attempting to revert completed order without policy
+      }),
+    });
+    assert.strictEqual(terminalRes.status, 409, `Expected 409 for terminal state mutation without override, got ${terminalRes.status}`);
+    const terminalData = await terminalRes.json();
+    assert.strictEqual(terminalData.success, false, "Should fail on terminal state alteration");
+    assert.ok(terminalData.error.includes("terminal state"), "Error message should mention terminal state");
+
+    // 2.7.3 Verify Non-Existent Order Rejected ❌ (HTTP 404)
+    const missingRes = await fetch(`${BASE_URL}/api/orders/update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
+      body: JSON.stringify({
+        orderNumber: "NEX-NON-EXISTENT-9999",
+        status: "accepted",
+      }),
+    });
+    assert.strictEqual(missingRes.status, 404, `Expected 404 for missing order, got ${missingRes.status}`);
+    const missingData = await missingRes.json();
+    assert.strictEqual(missingData.success, false, "Should fail when order not found");
+    assert.ok(missingData.error.includes("not found"), "Error message should mention not found");
+
+    recordResult("Admin", "Order FSM & terminal state guards", true, "Invalid transitions (400), terminal states (409), & unknown orders (404) strictly enforced");
   } catch (err) {
     recordResult("Admin", "Change order status", false, err.message);
   }
