@@ -317,26 +317,17 @@ function LoginContent() {
             {step === "details" && <User className="w-6 h-6" />}
           </div>
 
-          <span className="text-[10px] uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
-            {step === "phone" && (authMode === "login" ? "NEXORA Royal Access" : "New Royal Patron")}
-            {step === "otp" && "Encrypted Phone Verification"}
-            {step === "details" && "Guest Profile Personalization"}
-          </span>
-
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[var(--text-main)]">
-            {step === "phone" && (authMode === "login" ? "Patron Sign In" : "Create Account")}
+            {step === "phone" && (authMode === "login" ? "Sign In" : "Create Account")}
             {step === "otp" && "Verify Mobile"}
             {step === "details" && "Welcome to NEXORA"}
           </h1>
 
-          <p className="text-xs text-[var(--text-sub)] leading-relaxed">
-            {step === "phone" &&
-              (authMode === "login"
-                ? "Enter your 10-digit mobile number to access your account and orders."
-                : "Enter your 10-digit mobile number to create your royal dining profile.")}
-            {step === "otp" && `Enter the 6-digit verification code sent to +91 ${phoneInput}.`}
-            {step === "details" && "Tell us your name for fine dining delivery. Email is optional."}
-          </p>
+          {step === "otp" && (
+            <p className="text-xs text-[var(--text-sub)] leading-relaxed">
+              Enter the 6-digit verification code sent to +91 {phoneInput}.
+            </p>
+          )}
         </div>
 
         {/* Feedback Messages */}
@@ -381,9 +372,6 @@ function LoginContent() {
                   autoFocus
                 />
               </div>
-              <p className="text-[11px] text-[var(--text-sub-light)] pt-0.5">
-                Bina mobile number ke verification sambhav nahi hai.
-              </p>
             </div>
 
             <button
@@ -588,9 +576,9 @@ function LoginContent() {
         )}
 
         {/* Assurance */}
-        <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-center gap-2 text-[11px] text-[var(--text-sub-light)]">
-          <ShieldCheck className="w-3.5 h-3.5 text-[#d4af37]" />
-          <span>Password-Free Instant OTP Verification • 100% Secure</span>
+        <div className="pt-4 border-t border-[var(--card-border)] flex items-center justify-center gap-2 text-xs text-[var(--text-sub-light)]">
+          <ShieldCheck className="w-4 h-4 text-[#d4af37]" />
+          <span>100% Secure</span>
         </div>
       </div>
     </div>
