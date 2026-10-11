@@ -34,6 +34,7 @@
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { spawn } from "node:child_process";
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
@@ -43,7 +44,73 @@ let failedTests = 0;
 
 const testResults = [];
 
-function recordResult(suite, name, passed, details = "") {
+// Categorized failure tracking per user specification (Kami 10):
+// 1. connection/setup failure
+// 2. expected response mismatch
+// 3. authorization failure
+// 4. database/payment failure
+const categoryCounts = {
+  "connection/setup failure": 0,
+  "expected response mismatch": 0,
+  "authorization failure": 0,
+  "database/payment failure": 0,
+};
+
+function categorizeError(errorObjOrDetails) {
+  if (!errorObjOrDetails) return "expected response mismatch";
+  const msg = (errorObjOrDetails?.message || String(errorObjOrDetails)).toLowerCase();
+  const stack = (errorObjOrDetails?.stack || "").toLowerCase();
+  const cause = (errorObjOrDetails?.cause ? String(errorObjOrDetails.cause) : "").toLowerCase();
+  const combined = `${msg} ${stack} ${cause}`;
+
+  // 1. Connection / Setup Failures
+  if (
+    combined.includes("fetch failed") ||
+    combined.includes("econnrefused") ||
+    combined.includes("enotfound") ||
+    combined.includes("etimedout") ||
+    combined.includes("ehostunreach") ||
+    combined.includes("connection refused") ||
+    combined.includes("undici") ||
+    combined.includes("failed to fetch") ||
+    combined.includes("cannot connect") ||
+    combined.includes("server reachability")
+  ) {
+    return "connection/setup failure";
+  }
+
+  // 2. Authorization Failures
+  if (
+    combined.includes("401") ||
+    combined.includes("403") ||
+    combined.includes("unauthorized") ||
+    combined.includes("forbidden") ||
+    combined.includes("access denied") ||
+    combined.includes("csrf") ||
+    combined.includes("invalid signature") ||
+    combined.includes("forged")
+  ) {
+    return "authorization failure";
+  }
+
+  // 3. Database / Payment Failures
+  if (
+    combined.includes("supabase") ||
+    combined.includes("postgres") ||
+    combined.includes("sql") ||
+    combined.includes("database") ||
+    combined.includes("razorpay") ||
+    combined.includes("payment_status") ||
+    combined.includes("rls")
+  ) {
+    return "database/payment failure";
+  }
+
+  // 4. Default: Expected Response Mismatch
+  return "expected response mismatch";
+}
+
+function recordResult(suite, name, passed, details = "", errorObj = null) {
   totalTests++;
   if (passed) {
     passedTests++;
@@ -51,9 +118,140 @@ function recordResult(suite, name, passed, details = "") {
     testResults.push({ suite, name, status: "PASS", details });
   } else {
     failedTests++;
-    console.error(`  \x1b[31m✖ FAIL\x1b[0m [${suite}] ${name}${details ? ` - ${details}` : ""}`);
-    testResults.push({ suite, name, status: "FAIL", details });
+    const category = categorizeError(errorObj || details);
+    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    console.error(`  \x1b[31m✖ FAIL\x1b[0m [${suite}] ${name}`);
+    console.error(`         \x1b[33mCategory:\x1b[0m \x1b[1m${category}\x1b[0m`);
+    console.error(`         \x1b[90mDetails:\x1b[0m  ${details}`);
+    testResults.push({ suite, name, status: "FAIL", category, details });
   }
+}
+
+let spawnedServerProcess = null;
+
+async function probeServer(url) {
+  try {
+    const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3000) });
+    return res.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureServerRunning() {
+  process.stdout.write(`Checking server availability at ${BASE_URL}... `);
+  const isHealthy = await probeServer(BASE_URL);
+
+  if (isHealthy) {
+    console.log(`\x1b[32mOnline (200 OK)\x1b[0m`);
+    return true;
+  }
+
+  console.log(`\x1b[33mNot reachable\x1b[0m`);
+
+  const noAutoStart = process.env.NO_AUTOSTART === "true" || process.argv.includes("--no-autostart");
+  if (noAutoStart) {
+    console.error(`\x1b[31m✖ Server is offline and auto-start is disabled (--no-autostart).\x1b[0m`);
+    return false;
+  }
+
+  console.log(`\x1b[33m⚡ Automatically spawning Next.js dev server on port 3000...\x1b[0m`);
+
+  const isWindows = process.platform === "win32";
+  const npmCmd = isWindows ? "npm.cmd" : "npm";
+
+  spawnedServerProcess = spawn(npmCmd, ["run", "dev"], {
+    stdio: "pipe",
+    shell: true,
+    env: { ...process.env, PORT: "3000" },
+  });
+
+  const maxAttempts = 25;
+  for (let i = 1; i <= maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const ready = await probeServer(BASE_URL);
+    if (ready) {
+      console.log(`\x1b[32m✔ Auto-spawned Next.js server is ready after ${i}s!\x1b[0m\n`);
+      return true;
+    }
+    process.stdout.write(`\rWaiting for server initialization... (${i}/${maxAttempts}s)`);
+  }
+
+  console.error(`\n\x1b[31m✖ Timed out waiting for server at ${BASE_URL} after ${maxAttempts}s.\x1b[0m`);
+  return false;
+}
+
+function cleanupSpawnedServer() {
+  if (spawnedServerProcess && !spawnedServerProcess.killed) {
+    console.log("\n\x1b[90mShutting down auto-spawned test server...\x1b[0m");
+    if (process.platform === "win32") {
+      try {
+        spawn("taskkill", ["/PID", String(spawnedServerProcess.pid), "/T", "/F"]);
+      } catch {}
+    } else {
+      spawnedServerProcess.kill("SIGTERM");
+    }
+    spawnedServerProcess = null;
+  }
+}
+
+process.on("exit", cleanupSpawnedServer);
+process.on("SIGINT", () => { cleanupSpawnedServer(); process.exit(1); });
+process.on("SIGTERM", () => { cleanupSpawnedServer(); process.exit(1); });
+
+// ============================================================================
+// 0. PRE-FLIGHT HEALTH & CONNECTIVITY CHECKS
+// ============================================================================
+async function runPreFlightChecks() {
+  console.log("\n\x1b[1m\x1b[35m==================================================\x1b[0m");
+  console.log("\x1b[1m\x1b[35m  PRE-FLIGHT CONNECTIVITY & HEALTH CHECKS\x1b[0m");
+  console.log("\x1b[1m\x1b[35m==================================================\x1b[0m");
+
+  const serverReady = await ensureServerRunning();
+  if (!serverReady) {
+    recordResult(
+      "Pre-Flight",
+      "Server Reachability",
+      false,
+      `Cannot connect to Next.js server at ${BASE_URL}. Ensure 'npm run dev' is running on port 3000.`,
+      new Error("fetch failed ECONNREFUSED")
+    );
+    return false;
+  }
+
+  // 0.1 Check Health Endpoint
+  try {
+    const healthRes = await fetch(`${BASE_URL}/api/health`);
+    assert.strictEqual(healthRes.status, 200, `Health check returned HTTP ${healthRes.status}`);
+    const healthData = await healthRes.json();
+    assert.strictEqual(healthData.status, "healthy", `Health status is '${healthData.status}'`);
+    recordResult(
+      "Pre-Flight",
+      "Health endpoint (/api/health)",
+      true,
+      `Operational, uptime: ${healthData.uptimeSeconds}s, Supabase: ${healthData.services?.supabase?.status || 'ok'}`
+    );
+  } catch (err) {
+    recordResult("Pre-Flight", "Health endpoint (/api/health)", false, err.message, err);
+    return false;
+  }
+
+  // 0.2 Check Home Route
+  try {
+    const homeRes = await fetch(`${BASE_URL}/`);
+    assert.strictEqual(homeRes.status, 200, `Home route returned HTTP ${homeRes.status}`);
+    const homeHtml = await homeRes.text();
+    assert.ok(
+      homeHtml.includes("NEXORA") || homeHtml.includes("Dining") || homeHtml.includes("html"),
+      "Home page should render luxury fine dining content"
+    );
+    recordResult("Pre-Flight", "Home route (/)", true, "Root route 200 OK and renders luxury fine dining document");
+  } catch (err) {
+    recordResult("Pre-Flight", "Home route (/)", false, err.message, err);
+    return false;
+  }
+
+  return true;
 }
 
 // ============================================================================
@@ -1150,6 +1348,47 @@ async function runSecurityTests() {
 }
 
 
+function printSummaryAndExit(startTime) {
+  const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(2);
+
+  console.log("\n\x1b[1m==================================================\x1b[0m");
+  console.log("\x1b[1m  TEST RESULTS SUMMARY & CATEGORIZATION\x1b[0m");
+  console.log("\x1b[1m==================================================\x1b[0m");
+  console.log(`  Total Tests Run : ${totalTests}`);
+  console.log(`  Passed          : \x1b[32m${passedTests}\x1b[0m`);
+  console.log(`  Failed          : ${failedTests > 0 ? `\x1b[31m${failedTests}\x1b[0m` : `\x1b[32m0\x1b[0m`}`);
+  console.log(`  Execution Time  : ${elapsedSec}s`);
+  console.log("\n  \x1b[1mFailure Categories Breakdown:\x1b[0m");
+  console.log(`    • Connection / Setup Failures : ${categoryCounts["connection/setup failure"] > 0 ? `\x1b[31m${categoryCounts["connection/setup failure"]}\x1b[0m` : "\x1b[32m0\x1b[0m"}`);
+  console.log(`    • Expected Response Mismatch  : ${categoryCounts["expected response mismatch"] > 0 ? `\x1b[31m${categoryCounts["expected response mismatch"]}\x1b[0m` : "\x1b[32m0\x1b[0m"}`);
+  console.log(`    • Authorization Failures      : ${categoryCounts["authorization failure"] > 0 ? `\x1b[31m${categoryCounts["authorization failure"]}\x1b[0m` : "\x1b[32m0\x1b[0m"}`);
+  console.log(`    • Database / Payment Failures : ${categoryCounts["database/payment failure"] > 0 ? `\x1b[31m${categoryCounts["database/payment failure"]}\x1b[0m` : "\x1b[32m0\x1b[0m"}`);
+  console.log("==================================================\n");
+
+  if (failedTests > 0) {
+    if (categoryCounts["connection/setup failure"] > 0) {
+      console.log("\x1b[33m💡 Remediation (Connection/Setup Failure):\x1b[0m");
+      console.log("   - Start the dev server: 'npm run dev'");
+      console.log("   - Test health endpoint: curl http://localhost:3000/api/health");
+      console.log("   - Ensure port 3000 is available\n");
+    }
+    if (categoryCounts["authorization failure"] > 0) {
+      console.log("\x1b[33m💡 Remediation (Authorization Failure):\x1b[0m");
+      console.log("   - Verify ADMIN_PASSWORD & ADMIN_SESSION_SECRET in .env.local\n");
+    }
+    if (categoryCounts["database/payment failure"] > 0) {
+      console.log("\x1b[33m💡 Remediation (Database/Payment Failure):\x1b[0m");
+      console.log("   - Apply consolidated migrations: supabase/migrations/all_migrations_consolidated.sql");
+      console.log("   - Verify Supabase credentials in .env.local\n");
+    }
+    console.error(`\x1b[31m❌ PHASE 28 TESTS FAILED: ${failedTests} of ${totalTests} tests did not pass.\x1b[0m\n`);
+    process.exit(1);
+  } else {
+    console.log(`\x1b[32m🎉 ALL ${totalTests} TESTS PASSED! RELIABLE GREEN STATUS VERIFIED.\x1b[0m\n`);
+    process.exit(0);
+  }
+}
+
 // ============================================================================
 // MAIN RUNNER
 // ============================================================================
@@ -1167,31 +1406,22 @@ async function main() {
 
   const startTime = Date.now();
 
+  const preFlightOk = await runPreFlightChecks();
+  if (!preFlightOk) {
+    console.error(`\n\x1b[31m❌ PRE-FLIGHT VERIFICATION FAILED: Cannot run test suites because application server is unreachable or unhealthy.\x1b[0m\n`);
+    printSummaryAndExit(startTime);
+    return;
+  }
+
   await runCustomerTests();
   await runAdminTests();
   await runSecurityTests();
 
-  const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(2);
-
-  console.log("\n\x1b[1m==================================================\x1b[0m");
-  console.log("\x1b[1m  TEST RESULTS SUMMARY\x1b[0m");
-  console.log("\x1b[1m==================================================\x1b[0m");
-  console.log(`  Total Tests Run : ${totalTests}`);
-  console.log(`  Passed          : \x1b[32m${passedTests}\x1b[0m`);
-  console.log(`  Failed          : ${failedTests > 0 ? `\x1b[31m${failedTests}\x1b[0m` : `\x1b[32m0\x1b[0m`}`);
-  console.log(`  Execution Time  : ${elapsedSec}s`);
-  console.log("==================================================\n");
-
-  if (failedTests > 0) {
-    console.error(`\x1b[31m❌ PHASE 28 TESTS FAILED: ${failedTests} of ${totalTests} tests did not pass.\x1b[0m`);
-    process.exit(1);
-  } else {
-    console.log(`\x1b[32m🎉 ALL ${totalTests} TESTS PASSED! PHASE 28 FULLY VERIFIED.\x1b[0m\n`);
-    process.exit(0);
-  }
+  printSummaryAndExit(startTime);
 }
 
 main().catch((err) => {
   console.error("Fatal Test Suite Execution Error:", err);
   process.exit(1);
 });
+

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/run-phase28-tests.mjs"
+    "test": "node scripts/run-phase28-tests.mjs",
+    "health": "node -e \"fetch('http://localhost:3000/api/health').then(r=>r.json()).then(d=>console.log(JSON.stringify(d,null,2))).catch(e=>console.error('Server offline:',e.message))\"",
+    "migrations:consolidate": "node scripts/consolidate-migrations.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
