@@ -883,6 +883,56 @@ async function runSecurityTests() {
   } catch (err) {
     recordResult("Security", "Safe image upload guards ✔", false, err.message);
   }
+
+  // 3.8 Session Secret & CSRF Forgery Protections ✔
+  try {
+    const adminPassword = process.env.ADMIN_PASSWORD || "12345678";
+    const loginRes = await fetch(`${BASE_URL}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "nexora67@gmail.com", password: adminPassword }),
+    });
+    const setCookie = loginRes.headers.get("set-cookie") || "";
+    const adminCookie = setCookie ? setCookie.split(";")[0] : "";
+    assert.ok(setCookie.toLowerCase().includes("httponly"), "Session cookie MUST have HttpOnly flag");
+    assert.ok(setCookie.toLowerCase().includes("samesite=lax"), "Session cookie MUST have SameSite=Lax");
+
+    // A. CSRF Origin Mismatch Rejected (HTTP 403)
+    const csrfRes = await fetch(`${BASE_URL}/api/orders/update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: adminCookie,
+        Origin: "https://evil-phishing-site.attacker.com",
+      },
+      body: JSON.stringify({ orderNumber: "ORD-1047", status: "preparing" }),
+    });
+    assert.strictEqual(csrfRes.status, 403, `Expected 403 for CSRF origin mismatch, got ${csrfRes.status}`);
+    const csrfData = await csrfRes.json();
+    assert.strictEqual(csrfData.success, false);
+    assert.ok(csrfData.error.includes("CSRF"), "Error must mention CSRF block");
+
+    // B. Forged Session Signature Rejected (HTTP 401)
+    const forgedCookie = "nexora_admin_session=eyJpZCI6InVzZXJfMSIsImVtYWlsIjoiYWRtaW5AZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiQWRtaW4ifQ.ZmFrZV9mb3JnZWRfc2lnbmF0dXJl";
+    const forgedRes = await fetch(`${BASE_URL}/api/orders/update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: forgedCookie,
+      },
+      body: JSON.stringify({ orderNumber: "ORD-1047", status: "preparing" }),
+    });
+    assert.strictEqual(forgedRes.status, 401, `Expected 401 for forged token, got ${forgedRes.status}`);
+
+    recordResult(
+      "Security",
+      "Session cryptographic integrity & CSRF guard ✔",
+      true,
+      "HttpOnly/SameSite cookies, CSRF foreign origin rejection (403), and forged signature rejection (401) verified"
+    );
+  } catch (err) {
+    recordResult("Security", "Session cryptographic integrity & CSRF guard ✔", false, err.message);
+  }
 }
 
 

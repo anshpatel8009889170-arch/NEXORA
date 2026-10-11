@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ADMIN_SECRET =
-  process.env.ADMIN_SESSION_SECRET ||
-  process.env.RAZORPAY_KEY_SECRET ||
-  "nexora_admin_hmac_secret_production_luxury_2026_9e7f8a1b2c3d4e5f";
-
 export const ADMIN_COOKIE_NAME = "nexora_admin_session";
+export const ADMIN_SESSION_EXPIRY_SECONDS = 8 * 3600; // 8-hour shift expiry (limited expiry)
 
 export type AdminRole = "owner" | "admin" | "staff";
 
@@ -14,9 +10,52 @@ export interface AdminSession {
   email: string;
   role: AdminRole;
   name: string;
-  exp: number; // UNIX timestamp in seconds
+  iat: number; // Issued at timestamp (seconds)
+  exp: number; // Expiration timestamp (seconds)
 }
 
+/**
+ * Strict Environment Secret Retrieval (NO HARDCODED FALLBACK).
+ * Throws a fatal exception if ADMIN_SESSION_SECRET is missing or weak (<32 characters).
+ */
+export function getAdminSessionSecret(): string {
+  const secret = process.env.ADMIN_SESSION_SECRET?.trim();
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!secret) {
+    const errorMsg =
+      "FATAL SECURITY CONFIGURATION: ADMIN_SESSION_SECRET environment variable is missing. Startup aborted to prevent session token forgery.";
+    if (isProduction) {
+      throw new Error(errorMsg);
+    }
+    // Even in non-production, missing session secret is prohibited
+    throw new Error(errorMsg);
+  }
+
+  // Minimum 32-character (256 bits of entropy) security standard
+  if (secret.length < 32) {
+    const weakMsg = `FATAL SECURITY CONFIGURATION: ADMIN_SESSION_SECRET is too weak (${secret.length} chars). Minimum 32 characters (256-bit entropy) required.`;
+    throw new Error(weakMsg);
+  }
+
+  return secret;
+}
+
+/**
+ * Generates a cryptographically random 256-bit secret.
+ * Useful for secret generation, rotation, and testing.
+ */
+export function generateCryptographicSecret(bytes = 32): string {
+  const randomBytes = new Uint8Array(bytes);
+  globalThis.crypto.getRandomValues(randomBytes);
+  return Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// ============================================================================
+// BASE64URL ENCODING & DECODING (Edge Runtime & Node.js Universal)
+// ============================================================================
 function bufferToBase64Url(buf: ArrayBuffer | Uint8Array): string {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let binary = "";
@@ -66,18 +105,26 @@ async function getHmacKey(secret: string): Promise<CryptoKey> {
 
 /**
  * Creates a cryptographically signed HMAC SHA256 session token.
- * Universal (Edge Runtime and Node.js compatible).
+ * Validates required session claims and embeds iat & exp.
  */
 export async function createAdminToken(
-  session: Omit<AdminSession, "exp">,
-  expiresInSeconds = 7 * 24 * 3600
+  session: Omit<AdminSession, "exp" | "iat">,
+  expiresInSeconds = ADMIN_SESSION_EXPIRY_SECONDS
 ): Promise<string> {
-  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const payload: AdminSession = { ...session, exp };
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const secret = getAdminSessionSecret();
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + expiresInSeconds;
 
+  const payload: AdminSession = {
+    ...session,
+    iat: now,
+    exp,
+  };
+
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const encoder = new TextEncoder();
-  const key = await getHmacKey(ADMIN_SECRET);
+  const key = await getHmacKey(secret);
+
   const signatureBuffer = await globalThis.crypto.subtle.sign(
     "HMAC",
     key,
@@ -89,8 +136,8 @@ export async function createAdminToken(
 }
 
 /**
- * Verifies the token using constant-time Web Crypto API to prevent timing attacks.
- * Universal (Edge Runtime and Node.js compatible).
+ * Verifies token signature, expiry, role, and required claims using Web Crypto API.
+ * Constant-time signature verification prevents timing attacks.
  */
 export async function verifyAdminToken(token: string | null | undefined): Promise<AdminSession | null> {
   if (!token || typeof token !== "string") return null;
@@ -101,10 +148,12 @@ export async function verifyAdminToken(token: string | null | undefined): Promis
   const [encodedPayload, signature] = parts;
 
   try {
+    const secret = getAdminSessionSecret();
     const encoder = new TextEncoder();
-    const key = await getHmacKey(ADMIN_SECRET);
+    const key = await getHmacKey(secret);
     const signatureBytes = base64UrlToUint8Array(signature);
 
+    // 1. Cryptographic HMAC Signature Verification (constant-time)
     const isValid = await globalThis.crypto.subtle.verify(
       "HMAC",
       key,
@@ -116,15 +165,31 @@ export async function verifyAdminToken(token: string | null | undefined): Promis
       return null;
     }
 
+    // 2. Decode JSON payload
     const jsonStr = base64UrlDecode(encodedPayload);
-    const payload: AdminSession = JSON.parse(jsonStr);
+    const payload: Partial<AdminSession> = JSON.parse(jsonStr);
 
+    // 3. Verify all required claims
+    if (!payload.id || typeof payload.id !== "string") return null;
+    if (!payload.email || typeof payload.email !== "string" || !payload.email.includes("@")) return null;
+    if (!payload.name || typeof payload.name !== "string") return null;
+
+    // 4. Verify Role
+    const validRoles: AdminRole[] = ["owner", "admin", "staff"];
+    if (!payload.role || !validRoles.includes(payload.role as AdminRole)) return null;
+
+    // 5. Verify Expiry (Unexpired)
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp < now) {
+    if (!payload.exp || typeof payload.exp !== "number" || payload.exp < now) {
       return null; // Expired token
     }
 
-    return payload;
+    // 6. Verify iat (Issued at - not in future, with 60s clock skew tolerance)
+    if (payload.iat && typeof payload.iat === "number" && payload.iat > now + 60) {
+      return null;
+    }
+
+    return payload as AdminSession;
   } catch {
     return null;
   }
@@ -141,7 +206,7 @@ export async function getAdminSessionFromRequest(req: NextRequest | Request): Pr
     token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
   }
 
-  // 2. Fallback to header
+  // 2. Fallback to Authorization Header
   if (!token) {
     const authHeader = req.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
@@ -154,12 +219,17 @@ export async function getAdminSessionFromRequest(req: NextRequest | Request): Pr
 
 /**
  * Attaches a secure HTTP-Only cookie to a NextResponse.
+ * Enforces:
+ * - httpOnly: true (prevents XSS token exfiltration)
+ * - secure: in production (HTTPS only)
+ * - sameSite: 'lax' (prevents cross-site cookie leakage)
+ * - limited expiry: 8 hours
  */
 export async function setAdminCookieOnResponse(
   response: NextResponse,
-  session: Omit<AdminSession, "exp">
+  session: Omit<AdminSession, "exp" | "iat">
 ): Promise<void> {
-  const token = await createAdminToken(session);
+  const token = await createAdminToken(session, ADMIN_SESSION_EXPIRY_SECONDS);
   const isProduction = process.env.NODE_ENV === "production";
 
   response.cookies.set({
@@ -169,7 +239,7 @@ export async function setAdminCookieOnResponse(
     secure: isProduction,
     sameSite: "lax",
     path: "/",
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: ADMIN_SESSION_EXPIRY_SECONDS,
   });
 }
 
@@ -185,17 +255,65 @@ export function clearAdminCookieOnResponse(response: NextResponse): void {
     sameSite: "lax",
     path: "/",
     maxAge: 0,
+    expires: new Date(0),
   });
 }
 
 /**
+ * CSRF / Origin Verification for state-changing requests (POST, PUT, PATCH, DELETE).
+ * Verifies that request origin matches the target host header.
+ */
+export function verifyCsrfOrigin(req: NextRequest | Request): boolean {
+  const method = req.method.toUpperCase();
+  // Safe idempotent methods do not mutate state
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return true;
+  }
+
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+
+  if (!origin) {
+    const referer = req.headers.get("referer");
+    if (!referer) {
+      // In programmatic non-browser or test requests without origin/referer headers
+      return true;
+    }
+    try {
+      const refererUrl = new URL(referer);
+      return refererUrl.host === host;
+    } catch {
+      return false;
+    }
+  }
+
+  try {
+    const originUrl = new URL(origin);
+    // Origin host must match request Host
+    return originUrl.host === host;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Enforces role-based authorization for protected operations.
- * Returns { authorized: true, session } if valid, or { authorized: false, errorResponse } with 401/403.
  */
 export async function verifyRoleAuthorization(
   req: NextRequest | Request,
   allowedRoles: AdminRole[] = ["owner", "admin", "staff"]
 ): Promise<{ authorized: boolean; session?: AdminSession; errorResponse?: NextResponse }> {
+  // CSRF verification on mutating operations
+  if (!verifyCsrfOrigin(req)) {
+    return {
+      authorized: false,
+      errorResponse: NextResponse.json(
+        { success: false, error: "Cross-Site Request Forgery (CSRF) blocked: Origin mismatch." },
+        { status: 403 }
+      ),
+    };
+  }
+
   const session = await getAdminSessionFromRequest(req);
   if (!session) {
     return {
@@ -223,4 +341,3 @@ export async function verifyRoleAuthorization(
 
   return { authorized: true, session };
 }
-

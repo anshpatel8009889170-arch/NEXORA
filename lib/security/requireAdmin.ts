@@ -3,6 +3,7 @@ import {
   getAdminSessionFromRequest,
   AdminRole,
   AdminSession,
+  verifyCsrfOrigin,
 } from "@/lib/security/adminAuth";
 
 export interface RequireAdminSuccess {
@@ -29,13 +30,28 @@ export type RequireAdminResult = RequireAdminSuccess | RequireAdminFailure;
  * @param allowedRoles Allowed roles: 'owner' | 'admin' | 'staff' (defaults to ['owner', 'admin', 'staff'])
  * @returns {Promise<RequireAdminResult>}
  * - If unauthorized (no token / invalid signature): Returns { authorized: false, response: 401 }
- * - If forbidden (role not allowed): Returns { authorized: false, response: 403 }
+ * - If forbidden (role not allowed / CSRF mismatch): Returns { authorized: false, response: 403 }
  * - If authorized: Returns { authorized: true, user: session, response: null }
  */
 export async function requireAdmin(
   req: NextRequest | Request,
   allowedRoles: AdminRole[] = ["owner", "admin", "staff"]
 ): Promise<RequireAdminResult> {
+  // 1. CSRF Origin Verification on state-changing operations (POST, PUT, PATCH, DELETE)
+  if (!verifyCsrfOrigin(req)) {
+    return {
+      authorized: false,
+      user: null,
+      response: NextResponse.json(
+        {
+          success: false,
+          error: "Cross-Site Request Forgery (CSRF) blocked: Request origin does not match target host.",
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
   const session = await getAdminSessionFromRequest(req);
 
   // 1. Missing or invalid cryptographic session token
