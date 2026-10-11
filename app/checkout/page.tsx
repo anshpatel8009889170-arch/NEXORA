@@ -35,12 +35,6 @@ import { formatCurrency } from "@/utils/formatters";
 import { supabase } from "@/lib/supabase/client";
 import AddressMapPicker from "@/components/AddressMapPicker";
 
-// Razorpay type definition for window
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -657,7 +651,7 @@ export default function CheckoutPage() {
               </div>
             ) : (
               /* ========================================================
-                 PHASE 11 & 12: SECTIONS - DELIVERY & RAZORPAY PAYMENT
+                 SECTIONS - DELIVERY & PHONEPE PAYMENT GATEWAY
                  ======================================================== */
               <form onSubmit={handlePlaceOrder} className="space-y-6">
                 {/* Logged In Customer Pill */}
@@ -787,7 +781,7 @@ export default function CheckoutPage() {
                 {/* ========================================================
                     SECTION 3: PAYMENT
                     Initially: Cash on Delivery
-                    and later: UPI, Debit Card, Credit Card, Net Banking (Razorpay)
+                    and: PhonePe & UPI, Debit/Credit Cards, Net Banking via PhonePe PG
                     ======================================================== */}
                 <div className="p-6 sm:p-7 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-5">
                   <div className="flex items-center justify-between pb-3 border-b border-[var(--card-border)]">

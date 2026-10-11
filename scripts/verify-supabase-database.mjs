@@ -169,27 +169,27 @@ if (supabaseUrl && supabaseAnonKey) {
 }
 
 // ----------------------------------------------------------------------------
-// CHECK 4: Webhook & Payment Idempotency Verification
+// CHECK 4: PhonePe Webhook & Payment Idempotency Verification
 // ----------------------------------------------------------------------------
-console.log("\n\x1b[1m[4/6] Verifying Webhook & Payment Idempotency Logic...\x1b[0m");
-const webhookPath = path.resolve(__dirname, "../app/api/payment/webhook/route.ts");
-const verifyPath = path.resolve(__dirname, "../app/api/payment/verify/route.ts");
+console.log("\n\x1b[1m[4/6] Verifying PhonePe Webhook & Payment Idempotency Logic...\x1b[0m");
+const webhookPath = path.resolve(__dirname, "../app/api/payment/phonepe/webhook/route.ts");
+const statusPath = path.resolve(__dirname, "../app/api/payment/phonepe/status/route.ts");
 
-if (fs.existsSync(webhookPath) && fs.existsSync(verifyPath)) {
+if (fs.existsSync(webhookPath) && fs.existsSync(statusPath)) {
   const webhookCode = fs.readFileSync(webhookPath, "utf-8");
-  const verifyCode = fs.readFileSync(verifyPath, "utf-8");
+  const statusCode = fs.readFileSync(statusPath, "utf-8");
 
   // Check payment ledger existence check
-  const hasWebhookPaymentCheck = webhookCode.includes(".eq(\"transaction_id\", paymentId)");
-  logCheck("Webhook Payment Idempotency Check", hasWebhookPaymentCheck ? "PASS" : "FAIL", "Prevents duplicate payment ledger inserts");
+  const hasWebhookPaymentCheck = webhookCode.includes(".eq(\"transaction_id\", transactionId)");
+  logCheck("PhonePe Webhook Payment Idempotency Check", hasWebhookPaymentCheck ? "PASS" : "FAIL", "Prevents duplicate payment ledger inserts");
 
   // Check state machine protection (never regress from preparing/ready/delivered)
   const hasStatusGuard = webhookCode.includes("existingOrder.status === \"pending\"");
-  logCheck("Order Lifecycle State Regression Guard", hasStatusGuard ? "PASS" : "FAIL", "Retries will not revert completed or preparing orders");
+  logCheck("PhonePe Order Lifecycle State Regression Guard", hasStatusGuard ? "PASS" : "FAIL", "Retries will not revert completed or preparing orders");
 
-  // Check verify route ledger check
-  const hasVerifyPaymentCheck = verifyCode.includes(".eq(\"transaction_id\", safePaymentId)");
-  logCheck("Verify Route Idempotency Check", hasVerifyPaymentCheck ? "PASS" : "FAIL", "Duplicate client callbacks deduped");
+  // Check status route ledger check
+  const hasStatusPaymentCheck = statusCode.includes(".eq(\"transaction_id\", actualTxnId)");
+  logCheck("PhonePe Status Route Idempotency Check", hasStatusPaymentCheck ? "PASS" : "FAIL", "Duplicate client callbacks deduped");
 }
 
 // ----------------------------------------------------------------------------

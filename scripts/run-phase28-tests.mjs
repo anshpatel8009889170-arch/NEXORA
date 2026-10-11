@@ -99,7 +99,7 @@ function categorizeError(errorObjOrDetails) {
     combined.includes("postgres") ||
     combined.includes("sql") ||
     combined.includes("database") ||
-    combined.includes("razorpay") ||
+    combined.includes("phonepe") ||
     combined.includes("payment_status") ||
     combined.includes("rls")
   ) {
@@ -420,36 +420,7 @@ async function runCustomerTests() {
     recordResult("Customer", "Checkout", false, err.message);
   }
 
-  // 1.10 Payment Order Creation API
-  let createdPaymentOrderId = null;
-  try {
-    const res = await fetch(`${BASE_URL}/api/payment/create-order`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: 675,
-        currency: "INR",
-        notes: {
-          customerName: "Vaibhav Patel",
-          phone: "+91 83038 90056",
-          source: "Phase 28 Customer Test",
-        },
-      }),
-    });
-    assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
-    const data = await res.json();
-    assert.ok(data.success, "Order creation should return success: true");
-    assert.ok(data.orderId, "Should return Razorpay orderId");
-    assert.strictEqual(data.currency, "INR", "Currency must be INR");
-    assert.strictEqual(data.amount, 675, "Amount in rupees must be 675");
-    assert.strictEqual(data.amountInPaise, 67500, "Amount in paise must be 675 * 100 = 67500");
-    createdPaymentOrderId = data.orderId;
-    recordResult("Customer", "Payment", true, `Razorpay order generated: ${createdPaymentOrderId} (₹675 / 67500 paise)`);
-  } catch (err) {
-    recordResult("Customer", "Payment", false, err.message);
-  }
-
-  // 1.10.1 PhonePe PG Payment Order Creation & Recalculation API
+  // 1.10 Payment Order Creation API (PhonePe Payment Gateway)
   let createdPhonePeTxnId = null;
   const phonePeOrderNum = `ORD-PHONEPE-${Date.now()}`;
   try {
@@ -474,12 +445,12 @@ async function runCustomerTests() {
     assert.ok(data.redirectUrl, "Should return redirectUrl");
     assert.strictEqual(data.amount, 600, "Should recalculate Hakka Noodles (280*2 = 560 + 40 delivery = 600)");
     createdPhonePeTxnId = data.merchantTransactionId;
-    recordResult("Customer", "PhonePe payment initiation", true, `PhonePe order generated: ${createdPhonePeTxnId} (₹600) with redirect URL`);
+    recordResult("Customer", "Payment", true, `PhonePe order generated: ${createdPhonePeTxnId} (₹600) with redirect URL`);
   } catch (err) {
-    recordResult("Customer", "PhonePe payment initiation", false, err.message);
+    recordResult("Customer", "Payment", false, err.message);
   }
 
-  // 1.10.2 PhonePe PG Payment Status Verification API
+  // 1.10.1 PhonePe PG Payment Status Verification API
   try {
     const res = await fetch(`${BASE_URL}/api/payment/phonepe/status`, {
       method: "POST",
@@ -494,9 +465,9 @@ async function runCustomerTests() {
     assert.strictEqual(data.success, true, "Status query should succeed");
     assert.strictEqual(data.verified, true, "Payment should be verified");
     assert.strictEqual(data.code, "PAYMENT_SUCCESS", "Code should be PAYMENT_SUCCESS");
-    recordResult("Customer", "PhonePe payment verification", true, `Transaction ${createdPhonePeTxnId} verified and order marked paid`);
+    recordResult("Customer", "Payment verification", true, `Transaction ${createdPhonePeTxnId} verified and order marked paid`);
   } catch (err) {
-    recordResult("Customer", "PhonePe payment verification", false, err.message);
+    recordResult("Customer", "Payment verification", false, err.message);
   }
 
   // 1.11 Order Placement Model
@@ -509,7 +480,7 @@ async function runCustomerTests() {
       total_amount: 675,
       status: "pending",
       payment_method: "online",
-      payment_id: createdPaymentOrderId || "pay_mock_123",
+      payment_id: createdPhonePeTxnId || "MT_mock_123",
       items: [
         { name: "Biryani Awadhi Dum", price: 349, quantity: 1 },
         { name: "Paneer Tikka Charcoal", price: 299, quantity: 1 },
@@ -977,26 +948,26 @@ async function runSecurityTests() {
   // 3.4 Invalid Order Price → Reject ❌
   try {
     // A. Negative amount
-    const resNegative = await fetch(`${BASE_URL}/api/payment/create-order`, {
+    const resNegative = await fetch(`${BASE_URL}/api/payment/phonepe/create-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: -500 }),
+      body: JSON.stringify({ amount: -500, customerPhone: "+91 83038 90056", items: [{ id: "item-chinese-1", quantity: 1 }] }),
     });
     assert.strictEqual(resNegative.status, 400, `Expected 400 for negative amount, got ${resNegative.status}`);
 
     // B. Zero amount
-    const resZero = await fetch(`${BASE_URL}/api/payment/create-order`, {
+    const resZero = await fetch(`${BASE_URL}/api/payment/phonepe/create-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: 0 }),
+      body: JSON.stringify({ amount: 0, customerPhone: "+91 83038 90056", items: [{ id: "item-chinese-1", quantity: 1 }] }),
     });
     assert.strictEqual(resZero.status, 400, `Expected 400 for zero amount, got ${resZero.status}`);
 
     // C. Excessive/Overflow amount
-    const resOverflow = await fetch(`${BASE_URL}/api/payment/create-order`, {
+    const resOverflow = await fetch(`${BASE_URL}/api/payment/phonepe/create-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: 999999999 }),
+      body: JSON.stringify({ amount: 999999999, customerPhone: "+91 83038 90056", items: [{ id: "item-chinese-1", quantity: 1 }] }),
     });
     assert.strictEqual(resOverflow.status, 400, `Expected 400 for overflow amount, got ${resOverflow.status}`);
 
@@ -1213,8 +1184,9 @@ async function runSecurityTests() {
     assert.ok(envExampleContent.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY="), "Must include NEXT_PUBLIC_SUPABASE_ANON_KEY");
     assert.ok(envExampleContent.includes("SUPABASE_SERVICE_ROLE_KEY="), "Must include canonical SUPABASE_SERVICE_ROLE_KEY");
     assert.ok(!envExampleContent.includes("SUPABASE_KEY="), "Must NOT include ambiguous SUPABASE_KEY alias");
-    assert.ok(!envExampleContent.includes("RAZORPAY_KEY="), "Must NOT include ambiguous RAZORPAY_KEY alias");
-    assert.ok(!envExampleContent.includes("RAZORPAY_SECRET="), "Must NOT include ambiguous RAZORPAY_SECRET alias");
+    assert.ok(envExampleContent.includes("PHONEPE_MERCHANT_ID="), "Must include canonical PHONEPE_MERCHANT_ID");
+    assert.ok(envExampleContent.includes("PHONEPE_SALT_KEY="), "Must include canonical PHONEPE_SALT_KEY");
+    assert.ok(!envExampleContent.includes("RAZORPAY"), "Must NOT include Razorpay variables in .env.example");
 
     // 2. Verify maskKey logic
     function maskKey(key) {
@@ -1355,14 +1327,14 @@ async function runSecurityTests() {
     assert.strictEqual(checkoutData.amount, 600, "Client tampered amount of ₹1 must be completely discarded in favor of ₹600");
     assert.strictEqual(checkoutData.paymentMethod, "cod");
 
-    // 4. Price tampering defense on Payment Order Creation (/api/payment/create-order):
-    // Caller attempts to generate Razorpay order for ₹1 when items subtotal is ₹560 + delivery
-    const tamperedPaymentRes = await fetch(`${BASE_URL}/api/payment/create-order`, {
+    // 4. Price tampering defense on Payment Order Creation (/api/payment/phonepe/create-order):
+    // Caller attempts to generate PhonePe order for ₹1 when items subtotal is ₹560 + delivery
+    const tamperedPaymentRes = await fetch(`${BASE_URL}/api/payment/phonepe/create-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: 1, // Malicious client amount
-        currency: "INR",
+        customerPhone: "+91 83038 90056",
         items: [
           { id: "item-chinese-1", name: "Hakka Noodles", price: 1, quantity: 2 },
         ],

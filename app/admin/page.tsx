@@ -165,7 +165,7 @@ export default function AdminDashboardPage() {
       items: ["2 × Biryani", "1 × Paneer Tikka"],
       total: 847,
       status: "pending",
-      paymentMethod: "Online (Razorpay)",
+      paymentMethod: "Online (PhonePe / UPI)",
       paymentStatus: "paid",
       time: "Just now",
       address: "Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe",

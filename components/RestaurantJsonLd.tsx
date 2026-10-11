@@ -32,7 +32,7 @@ export default function RestaurantJsonLd() {
     hasMenu: `${baseUrl}/menu`,
     acceptsReservations: "True",
     currenciesAccepted: "INR",
-    paymentAccepted: "Cash, Credit Card, Debit Card, UPI, Net Banking, Razorpay",
+    paymentAccepted: "Cash, Credit Card, Debit Card, UPI, Net Banking, PhonePe",
     address: {
       "@type": "PostalAddress",
       streetAddress: "Sathigva, Amauli-Fatehpur Road",

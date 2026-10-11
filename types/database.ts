@@ -121,7 +121,7 @@ export interface Address {
 export interface Payment {
   id: string;
   order_id: string;
-  provider: string; // 'cod', 'razorpay', 'upi', 'stripe'
+  provider: string; // 'cod', 'phonepe', 'upi', 'cards'
   transaction_id?: string | null;
   amount: number;
   status: PaymentStatus;

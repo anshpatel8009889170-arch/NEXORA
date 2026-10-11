@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateSupabaseConfig } from "@/lib/supabase/server";
+import { getPhonePeConfig } from "@/lib/phonepe";
 
 
 /**
@@ -13,9 +14,8 @@ export async function GET() {
   // 1. Supabase configuration check
   const supabaseConfig = validateSupabaseConfig();
 
-  // 2. Razorpay configuration check
-  const hasRazorpayKey = Boolean(process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
-  const hasRazorpaySecret = Boolean(process.env.RAZORPAY_KEY_SECRET);
+  // 2. PhonePe Payment Gateway configuration check
+  const phonepeConfig = getPhonePeConfig();
 
   // 3. Admin Authentication check
   const hasAdminEmail = Boolean(process.env.ADMIN_EMAIL);
@@ -38,10 +38,10 @@ export async function GET() {
           hasServiceRoleKey: supabaseConfig.hasServiceRoleKey,
           status: supabaseConfig.hasUrl ? "operational" : "unconfigured",
         },
-        razorpay: {
-          configured: hasRazorpayKey,
-          hasSecret: hasRazorpaySecret,
-          mode: (process.env.RAZORPAY_KEY_ID || "").startsWith("rzp_live") ? "live" : "test",
+        phonepe: {
+          configured: Boolean(phonepeConfig.merchantId && phonepeConfig.saltKey),
+          environment: phonepeConfig.environment,
+          merchantId: phonepeConfig.merchantId,
         },
         adminAuth: {
           configured: hasAdminEmail && hasAdminPassword,

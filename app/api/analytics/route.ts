@@ -131,7 +131,7 @@ export const DEMO_BENCHMARK_ANALYTICS: AnalyticsData = {
     { name: "Desserts & Drinks", percentage: 12, amount: 41136 },
   ],
   paymentBreakdown: [
-    { method: "Online (Razorpay / UPI)", percentage: 68, count: 877 },
+    { method: "Online (PhonePe / UPI)", percentage: 68, count: 877 },
     { method: "Cash on Delivery (COD)", percentage: 32, count: 413 },
   ],
   peakHours: [
@@ -240,7 +240,7 @@ function calculateAnalyticsFromOrders(orders: any[]): AnalyticsData {
       const cleanPm =
         pm.includes("cod") || pm.includes("cash")
           ? "Cash on Delivery (COD)"
-          : "Online (Razorpay / UPI)";
+          : "Online (PhonePe / UPI)";
       paymentTally[cleanPm] = (paymentTally[cleanPm] || 0) + 1;
 
       // Hourly rush breakdown

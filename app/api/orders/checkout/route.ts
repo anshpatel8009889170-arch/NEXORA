@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { getRazorpayClient } from "@/lib/razorpay";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { sanitizeString, validatePhone } from "@/lib/security/validation";
 import { recalculateOrderFromDatabase } from "@/lib/orders/orderCalculator";
@@ -63,14 +62,12 @@ export async function POST(req: NextRequest) {
     const customerSession = await getCustomerSessionFromRequest(req);
     const userId = customerSession?.id || null;
 
-    // 6. Handle Online Payment Gateway (PhonePe PG + Razorpay fallback)
-    let razorpayOrderId: string | null = null;
+    // 6. Handle Online Payment Gateway (PhonePe PG - Swiggy / Zomato UPI Intent Flow)
     let phonePeRedirectUrl: string | null = null;
     let merchantTransactionId: string | null = null;
     const amountInPaise = Math.round(recalculated.grandTotal * 100);
 
     if (isOnlinePayment) {
-      // Primary: PhonePe Payment Gateway (Swiggy / Zomato UPI Intent Flow)
       try {
         const origin = req.nextUrl.origin || "http://localhost:3000";
         const phonePeResult = await initiatePhonePePayment({
@@ -87,25 +84,6 @@ export async function POST(req: NextRequest) {
         }
       } catch (peErr) {
         console.warn("PhonePe initiation notice:", peErr);
-      }
-
-      // Secondary / Fallback: Razorpay
-      const razorpay = getRazorpayClient();
-      if (razorpay) {
-        const rzpOrder = await razorpay.orders.create({
-          amount: amountInPaise,
-          currency: "INR",
-          receipt: safeOrderNumber,
-          notes: {
-            customerName: safeCustomerName,
-            customerPhone: safePhone,
-            couponCode: recalculated.couponCode || "None",
-            subtotal: String(recalculated.subtotal),
-          },
-        });
-        razorpayOrderId = rzpOrder.id;
-      } else {
-        razorpayOrderId = `order_demo_${Date.now()}`;
       }
     }
 
@@ -131,7 +109,7 @@ export async function POST(req: NextRequest) {
       total: recalculated.grandTotal,
       coupon_code: recalculated.couponCode,
       notes: isOnlinePayment
-        ? `Razorpay Order: ${razorpayOrderId}${recalculated.couponCode ? ` (Coupon: ${recalculated.couponCode})` : ""}`
+        ? `PhonePe PG Order${merchantTransactionId ? ` (${merchantTransactionId})` : ""}${recalculated.couponCode ? ` (Coupon: ${recalculated.couponCode})` : ""}`
         : recalculated.couponCode
         ? `Coupon: ${recalculated.couponCode}`
         : null,
@@ -206,11 +184,9 @@ export async function POST(req: NextRequest) {
         provider: "phonepe",
         redirectUrl: phonePeRedirectUrl,
         merchantTransactionId,
-        orderId: razorpayOrderId,
         amount: recalculated.grandTotal,
         amountInPaise,
         currency: "INR",
-        keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || "rzp_test_demo",
         calculated: recalculated,
       });
     }

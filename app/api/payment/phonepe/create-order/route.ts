@@ -35,6 +35,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate explicit amount if provided (Defense in depth against zero, negative or overflow)
+    if (typeof body.amount === "number") {
+      if (body.amount <= 0 || body.amount > 500000) {
+        return NextResponse.json(
+          { success: false, error: "Invalid payment amount specified." },
+          { status: 400 }
+        );
+      }
+    }
+
     // 3. Mandatory Customer Phone Validation
     const phoneValidation = validatePhone(customerPhone || "");
     if (!phoneValidation.isValid) {
