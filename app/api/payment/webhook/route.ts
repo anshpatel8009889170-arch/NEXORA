@@ -42,27 +42,64 @@ export async function POST(req: Request) {
 
     const event = JSON.parse(rawBody);
 
-    // 3. Handle payment.captured or order.paid events
+    // 3. Handle payment.captured or order.paid events with strict idempotency
     if (event.event === "payment.captured" || event.event === "order.paid") {
       const payment = event.payload?.payment?.entity;
       const orderId = payment?.order_id;
       const receipt = payment?.notes?.orderNumber || payment?.description;
+      const paymentId = payment?.id;
 
-      console.log(`✅ Webhook verified event: ${event.event} for order ${orderId || receipt}`);
+      console.log(`✅ Webhook verified event: ${event.event} for order ${orderId || receipt} (Payment: ${paymentId})`);
 
-      // Update database order to paid
       if (receipt) {
         try {
           const supabase = createServerClient({ admin: true });
-          await supabase
+
+          // Fetch current order state to ensure idempotency
+          const { data: existingOrder } = await supabase
             .from("orders")
-            .update({
+            .select("id, status, payment_status, total_amount")
+            .eq("order_number", receipt)
+            .maybeSingle();
+
+          if (existingOrder) {
+            // Idempotency: Prevent duplicate payment records
+            if (paymentId) {
+              const { data: existingPayment } = await supabase
+                .from("payments")
+                .select("id")
+                .eq("transaction_id", paymentId)
+                .maybeSingle();
+
+              if (!existingPayment) {
+                await supabase.from("payments").insert({
+                  order_id: existingOrder.id,
+                  provider: "razorpay",
+                  transaction_id: paymentId,
+                  amount: existingOrder.total_amount || (payment?.amount ? payment.amount / 100 : 0),
+                  status: "paid",
+                  created_at: new Date().toISOString(),
+                });
+              }
+            }
+
+            // State machine guard: Only transition status to 'accepted' if currently 'pending'
+            // Never regress 'preparing', 'ready', or 'delivered' states on webhook retries
+            const shouldTransitionStatus = existingOrder.status === "pending";
+            const updatePayload: Record<string, unknown> = {
               payment_status: "paid",
-              status: "accepted",
-              notes: `Webhook confirmed paid: ${payment?.id}`,
+              notes: `Webhook confirmed paid: ${paymentId || "verified"}`,
               updated_at: new Date().toISOString(),
-            })
-            .eq("order_number", receipt);
+            };
+            if (shouldTransitionStatus) {
+              updatePayload.status = "accepted";
+            }
+
+            await supabase
+              .from("orders")
+              .update(updatePayload)
+              .eq("order_number", receipt);
+          }
         } catch (dbErr) {
           console.warn("Webhook DB update warning:", dbErr);
         }

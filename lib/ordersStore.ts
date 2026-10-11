@@ -19,6 +19,7 @@ export interface StoredOrder {
   payment_method?: string;
   payment_status?: string;
   status_history: StatusHistoryEntry[];
+  items?: Array<{ id: string; name: string; price: number; quantity: number }>;
   created_at: string;
   updated_at: string;
   notes?: string | null;

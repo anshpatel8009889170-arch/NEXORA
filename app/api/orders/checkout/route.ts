@@ -117,20 +117,49 @@ export async function POST(req: NextRequest) {
       updated_at: nowIso,
     };
 
+    let createdOrderId: string | null = null;
     try {
-      await supabase.from("orders").insert(orderRecord);
+      const { data: insertedOrder, error: orderInsertErr } = await supabase
+        .from("orders")
+        .insert(orderRecord)
+        .select("id")
+        .maybeSingle();
+
+      if (orderInsertErr) {
+        console.warn("Supabase order insert notice:", orderInsertErr.message);
+      } else if (insertedOrder?.id) {
+        createdOrderId = insertedOrder.id;
+        // Insert order_items with foreign key relationship to orders(id)
+        if (Array.isArray(recalculated.items) && recalculated.items.length > 0) {
+          const itemRows = recalculated.items.map((item) => ({
+            order_id: createdOrderId,
+            item_name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            unit_price: item.price,
+            total_price: Math.round(item.price * item.quantity),
+          }));
+          const { error: itemsInsertErr } = await supabase
+            .from("order_items")
+            .insert(itemRows);
+          if (itemsInsertErr) {
+            console.warn("Supabase order_items insert notice:", itemsInsertErr.message);
+          }
+        }
+      }
     } catch (dbErr) {
       console.warn("Supabase order insert warning:", dbErr);
     }
 
     // Update resilient runtime orders cache
     saveRuntimeOrder({
-      id: `ord_${Date.now()}`,
+      id: createdOrderId || `ord_${Date.now()}`,
       order_number: safeOrderNumber,
       customer_name: safeCustomerName,
       customer_phone: safePhone,
       total: recalculated.grandTotal,
       total_amount: recalculated.grandTotal,
+      items: recalculated.items,
       status: "pending",
       payment_method: isOnlinePayment ? "online" : "cod",
       payment_status: "pending",

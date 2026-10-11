@@ -85,25 +85,50 @@ export async function POST(req: Request) {
     }
 
     // 4. Signature is 100% verified by backend!
-    // Update database order to 'paid' and 'accepted'
+    // Update database order to 'paid' with strict idempotency
     try {
-      const supabase = createServerClient();
-      await supabase
-        .from("orders")
-        .update({
-          payment_status: "paid",
-          status: "accepted",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("order_number", safeOrderNumber);
+      const supabase = createServerClient({ admin: true });
 
-      // Record entry in payments ledger
-      await supabase.from("payments").insert({
-        provider: "razorpay",
-        transaction_id: safePaymentId,
-        status: "paid",
-        created_at: new Date().toISOString(),
-      });
+      const { data: existingOrder } = await supabase
+        .from("orders")
+        .select("id, status, payment_status, total_amount")
+        .eq("order_number", safeOrderNumber)
+        .maybeSingle();
+
+      if (existingOrder) {
+        // Idempotency: Prevent duplicate payment records
+        const { data: existingPayment } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("transaction_id", safePaymentId)
+          .maybeSingle();
+
+        if (!existingPayment) {
+          await supabase.from("payments").insert({
+            order_id: existingOrder.id,
+            provider: "razorpay",
+            transaction_id: safePaymentId,
+            amount: existingOrder.total_amount || 0,
+            status: "paid",
+            created_at: new Date().toISOString(),
+          });
+        }
+
+        // State machine guard: only transition status to 'accepted' if currently 'pending'
+        const shouldTransitionStatus = existingOrder.status === "pending";
+        const updatePayload: Record<string, unknown> = {
+          payment_status: "paid",
+          updated_at: new Date().toISOString(),
+        };
+        if (shouldTransitionStatus) {
+          updatePayload.status = "accepted";
+        }
+
+        await supabase
+          .from("orders")
+          .update(updatePayload)
+          .eq("order_number", safeOrderNumber);
+      }
     } catch (dbErr) {
       console.warn("DB update payment status notice:", dbErr);
     }
