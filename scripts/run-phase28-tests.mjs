@@ -300,25 +300,26 @@ async function runAdminTests() {
 
   // 2.1 Admin Login
   try {
+    const adminPassword = process.env.ADMIN_PASSWORD || "Nexora@Admin2026!SecureKey";
     const res = await fetch(`${BASE_URL}/api/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "nexora67@gmail.com",
-        password: "123456",
+        password: adminPassword,
       }),
     });
     assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
     const data = await res.json();
     assert.ok(data.success, "Login should return success: true");
-    assert.strictEqual(data.user.role, "admin", "User role must be admin");
+    assert.ok(data.user.role === "admin" || data.user.role === "owner", `User role must be admin or owner, got ${data.user.role}`);
     assert.strictEqual(data.user.email, "nexora67@gmail.com", "Email must match admin email");
 
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) {
       adminCookie = setCookie.split(";")[0];
     }
-    recordResult("Admin", "Login", true, "Authenticated with owner credentials, session cookie obtained");
+    recordResult("Admin", "Login", true, "Authenticated with secure owner credentials, session cookie obtained");
   } catch (err) {
     recordResult("Admin", "Login", false, err.message);
   }
@@ -382,7 +383,10 @@ async function runAdminTests() {
   try {
     const res = await fetch(`${BASE_URL}/api/orders/update-status`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
       body: JSON.stringify({
         orderNumber: "NEX-1048",
         status: "accepted",
@@ -401,7 +405,10 @@ async function runAdminTests() {
   try {
     const res = await fetch(`${BASE_URL}/api/orders/update-status`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
       body: JSON.stringify({
         orderNumber: "NEX-1049",
         status: "cancelled",
@@ -429,7 +436,10 @@ async function runAdminTests() {
     for (const st of statusPipeline) {
       const res = await fetch(`${BASE_URL}/api/orders/update-status`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminCookie ? { Cookie: adminCookie } : {}),
+        },
         body: JSON.stringify({
           orderNumber: "NEX-1048",
           status: st,
@@ -450,7 +460,10 @@ async function runAdminTests() {
     const testOfferCode = "TESTSAVE50";
     const res = await fetch(`${BASE_URL}/api/offers`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
       body: JSON.stringify({
         code: testOfferCode,
         description: "Special 20% discount on orders above ₹499",
@@ -480,7 +493,12 @@ async function runAdminTests() {
     assert.strictEqual(verifyData.discountAmount, 120, "20% of 600 = 120");
 
     // Clean up test offer
-    await fetch(`${BASE_URL}/api/offers?code=${testOfferCode}`, { method: "DELETE" });
+    await fetch(`${BASE_URL}/api/offers?code=${testOfferCode}`, {
+      method: "DELETE",
+      headers: {
+        ...(adminCookie ? { Cookie: adminCookie } : {}),
+      },
+    });
 
     recordResult("Admin", "Create offer", true, `Offer '${testOfferCode}' created, verified with ₹120 discount, & cleaned up`);
   } catch (err) {
@@ -608,7 +626,36 @@ async function runSecurityTests() {
   } catch (err) {
     recordResult("Security", "Invalid coupon → reject ❌", false, err.message);
   }
+
+  // 3.6 Hardcoded Legacy Credentials → Reject ❌
+  try {
+    const weakPasswords = ["123456", "admin123", "nexora2026", "short"];
+    for (const wp of weakPasswords) {
+      const res = await fetch(`${BASE_URL}/api/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "nexora67@gmail.com",
+          password: wp,
+        }),
+      });
+      assert.strictEqual(
+        res.status >= 400 && res.status < 500,
+        true,
+        `Legacy/weak password '${wp}' should be rejected (got ${res.status})`
+      );
+    }
+    recordResult(
+      "Security",
+      "Hardcoded credentials → reject ❌",
+      true,
+      "Deprecated credentials (123456, admin123, nexora2026) strictly rejected with 400/401"
+    );
+  } catch (err) {
+    recordResult("Security", "Hardcoded credentials → reject ❌", false, err.message);
+  }
 }
+
 
 // ============================================================================
 // MAIN RUNNER

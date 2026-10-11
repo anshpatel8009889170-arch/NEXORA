@@ -71,13 +71,6 @@ export default function AdminLoginPage() {
     }
   };
 
-  // Quick autofill helper for owner testing
-  const handleAutofillOwner = () => {
-    setEmail("nexora67@gmail.com");
-    setPassword("123456");
-    setErrorMessage(null);
-  };
-
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-main)] flex flex-col items-center justify-center px-4 py-16 selection:bg-[#d4af37]/30 selection:text-white relative overflow-hidden">
       {/* Subtle Ambient Gold Glow */}
@@ -201,17 +194,14 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Fill Helper for Testing */}
-          <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-[11px]">
-            <button
-              type="button"
-              onClick={handleAutofillOwner}
-              className="text-[#d4af37] hover:underline"
-            >
-              Autofill Testing Credentials (nexora67 / 123456)
-            </button>
-            <span className="text-[var(--text-sub-light)]">
-              MFA / 2FA Ready
+          {/* Security & Access Notice */}
+          <div className="pt-2 border-t border-[var(--card-border)] flex items-center justify-between text-[11px] text-[var(--text-sub-light)]">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#d4af37]" />
+              <span>Encrypted Server-Side RBAC</span>
+            </span>
+            <span className="text-[var(--text-sub)]">
+              Rate-Limited & Audited
             </span>
           </div>
 

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { verifyRoleAuthorization } from "@/lib/security/adminAuth";
 
 export async function POST(request: NextRequest) {
   try {
+    const authCheck = await verifyRoleAuthorization(request, ["owner", "admin", "staff"]);
+    if (!authCheck.authorized) {
+      return authCheck.errorResponse!;
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const bucketName = (formData.get("bucket") as string) || "menu-images";

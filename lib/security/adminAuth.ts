@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 const ADMIN_SECRET =
   process.env.ADMIN_SESSION_SECRET ||
   process.env.RAZORPAY_KEY_SECRET ||
-  "nexora_admin_secret_super_key_2026_luxury";
+  "nexora_admin_hmac_secret_production_luxury_2026_9e7f8a1b2c3d4e5f";
 
 export const ADMIN_COOKIE_NAME = "nexora_admin_session";
+
+export type AdminRole = "owner" | "admin" | "staff";
 
 export interface AdminSession {
   id: string;
   email: string;
-  role: "admin" | "owner" | "staff";
+  role: AdminRole;
   name: string;
   exp: number; // UNIX timestamp in seconds
 }
@@ -185,3 +187,40 @@ export function clearAdminCookieOnResponse(response: NextResponse): void {
     maxAge: 0,
   });
 }
+
+/**
+ * Enforces role-based authorization for protected operations.
+ * Returns { authorized: true, session } if valid, or { authorized: false, errorResponse } with 401/403.
+ */
+export async function verifyRoleAuthorization(
+  req: NextRequest | Request,
+  allowedRoles: AdminRole[] = ["owner", "admin", "staff"]
+): Promise<{ authorized: boolean; session?: AdminSession; errorResponse?: NextResponse }> {
+  const session = await getAdminSessionFromRequest(req);
+  if (!session) {
+    return {
+      authorized: false,
+      errorResponse: NextResponse.json(
+        { success: false, error: "Access Denied: Valid administrator authorization required." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (!allowedRoles.includes(session.role)) {
+    return {
+      authorized: false,
+      session,
+      errorResponse: NextResponse.json(
+        {
+          success: false,
+          error: `Access Denied: Role '${session.role}' is not authorized for this operation. Required: ${allowedRoles.join(" or ")}.`,
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { authorized: true, session };
+}
+
