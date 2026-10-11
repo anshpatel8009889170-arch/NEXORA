@@ -798,6 +798,91 @@ async function runSecurityTests() {
   } catch (err) {
     recordResult("Security", "Hardcoded credentials → reject ❌", false, err.message);
   }
+
+  // 3.7 Safe Image Upload Guards ❌ / ✔
+  try {
+    // A. Anonymous upload rejected (401)
+    const resAnon = await fetch(`${BASE_URL}/api/upload`, { method: "POST" });
+    assert.strictEqual(resAnon.status, 401, `Expected 401 for anonymous upload, got ${resAnon.status}`);
+
+    // Fetch valid admin session cookie
+    const adminPassword = process.env.ADMIN_PASSWORD || "12345678";
+    const loginRes = await fetch(`${BASE_URL}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "nexora67@gmail.com", password: adminPassword }),
+    });
+    const setCookie = loginRes.headers.get("set-cookie");
+    const adminCookie = setCookie ? setCookie.split(";")[0] : "";
+
+    // B. Spoofed binary content rejected (400)
+    const fakeBlob = new Blob(["malicious non-image executable script content"], { type: "image/png" });
+    const formSpoof = new FormData();
+    formSpoof.append("file", fakeBlob, "shell.png");
+    const resSpoof = await fetch(`${BASE_URL}/api/upload`, {
+      method: "POST",
+      headers: { Cookie: adminCookie },
+      body: formSpoof,
+    });
+    assert.strictEqual(resSpoof.status, 400, `Expected 400 for spoofed image, got ${resSpoof.status}`);
+    const dataSpoof = await resSpoof.json();
+    assert.strictEqual(dataSpoof.success, false);
+    assert.ok(dataSpoof.error.includes("signature"), "Error must mention file signature validation");
+
+    // C. Disallowed bucket rejected (400)
+    const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const genuinePng = Buffer.from(pngBase64, "base64");
+    const formBucket = new FormData();
+    formBucket.append("file", new Blob([genuinePng], { type: "image/png" }), "test.png");
+    formBucket.append("bucket", "secret-system-bucket");
+    const resBucket = await fetch(`${BASE_URL}/api/upload`, {
+      method: "POST",
+      headers: { Cookie: adminCookie },
+      body: formBucket,
+    });
+    assert.strictEqual(resBucket.status, 400, `Expected 400 for invalid bucket, got ${resBucket.status}`);
+    const dataBucket = await resBucket.json();
+    assert.strictEqual(dataBucket.success, false);
+    assert.ok(dataBucket.error.includes("Invalid storage bucket"), "Error must mention invalid storage bucket");
+
+    // D. Oversized file (> 5 MB) rejected (400)
+    const hugeBuf = Buffer.alloc(6 * 1024 * 1024);
+    const formHuge = new FormData();
+    formHuge.append("file", new Blob([hugeBuf], { type: "image/png" }), "huge.png");
+    const resHuge = await fetch(`${BASE_URL}/api/upload`, {
+      method: "POST",
+      headers: { Cookie: adminCookie },
+      body: formHuge,
+    });
+    assert.strictEqual(resHuge.status, 400, `Expected 400 for oversized image, got ${resHuge.status}`);
+    const dataHuge = await resHuge.json();
+    assert.strictEqual(dataHuge.success, false);
+    assert.ok(dataHuge.error.includes("5 MB limit"), "Error must mention 5 MB limit");
+
+    // E. Genuine verified image upload succeeds with UUID (200)
+    const formValid = new FormData();
+    formValid.append("file", new Blob([genuinePng], { type: "image/png" }), "shahi-tukda.png");
+    formValid.append("bucket", "menu-images");
+    const resValid = await fetch(`${BASE_URL}/api/upload`, {
+      method: "POST",
+      headers: { Cookie: adminCookie },
+      body: formValid,
+    });
+    assert.strictEqual(resValid.status, 200, `Expected 200 for valid image upload, got ${resValid.status}`);
+    const dataValid = await resValid.json();
+    assert.strictEqual(dataValid.success, true, "Upload should return success: true");
+    assert.ok(dataValid.url.includes("https://"), "Must return real CDN URL");
+    assert.ok(dataValid.path.includes("dishes/"), "Path must be under dishes/");
+
+    recordResult(
+      "Security",
+      "Safe image upload guards ✔",
+      true,
+      "Admin-only, bucket allow-list, magic bytes, 5MB limit, and UUID filename verified"
+    );
+  } catch (err) {
+    recordResult("Security", "Safe image upload guards ✔", false, err.message);
+  }
 }
 
 
