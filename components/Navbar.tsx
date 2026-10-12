@@ -1,25 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ShoppingBag, Menu, X, User, Sparkles } from "lucide-react";
+import { ShoppingBag, User, Sparkles } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRestaurantSettings } from "@/context/SettingsContext";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Navbar() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const { isLoggedIn, profile } = useAuth();
   const { settings } = useRestaurantSettings();
 
+  // Smart Scroll Header: Hide on scroll down, show on scroll up
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Near the very top, always show
+          if (currentScrollY < 30) {
+            setIsVisible(true);
+          } else if (currentScrollY > lastScrollY && currentScrollY > 70) {
+            // Scrolling down -> hide navbar
+            setIsVisible(false);
+          } else if (currentScrollY < lastScrollY) {
+            // Scrolling up -> reveal navbar
+            setIsVisible(true);
+          }
+          setLastScrollY(currentScrollY);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] transition-colors duration-200">
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] transition-transform duration-300 ease-in-out ${
+        isVisible ? "translate-y-0" : "-translate-y-full"
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* LOGO */}
+          {/* LOGO (Exact same size maintained) */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-12 h-12 rounded-full overflow-hidden shadow-md group-hover:scale-105 transition-all duration-300">
               <Image
@@ -110,86 +146,12 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile Right Controls: Day/Night Theme Toggle & Hamburger Drawer Menu */}
-          <div className="flex md:hidden items-center gap-2.5">
+          {/* Mobile Right Controls: Day/Night Theme Toggle Only (Three lines hamburger removed) */}
+          <div className="flex md:hidden items-center">
             <ThemeToggle />
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              className="p-2.5 rounded-xl bg-[var(--card-bg)] border border-[#d4af37]/40 text-[#d4af37] hover:border-[#d4af37] active:scale-95 transition-all cursor-pointer touch-manipulation select-none flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-[#d4af37]"
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? (
-                <X className="w-6 h-6 pointer-events-none text-[#d4af37]" />
-              ) : (
-                <Menu className="w-6 h-6 pointer-events-none text-[#d4af37]" />
-              )}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-[var(--background)] backdrop-blur-xl border-b border-[var(--card-border)] px-6 py-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2 duration-200">
-          <Link
-            href="/"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
-          >
-            Home
-          </Link>
-          <Link
-            href="/menu"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
-          >
-            Menu
-          </Link>
-          <Link
-            href="/menu"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
-          >
-            Order Online
-          </Link>
-          <Link
-            href="/#about"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
-          >
-            About
-          </Link>
-          <Link
-            href="/offers"
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center justify-between py-2.5 px-3 rounded-lg text-sm uppercase tracking-widest text-[var(--text-main)] hover:text-[#d4af37] hover:bg-white/5 transition-all"
-          >
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#d4af37]" />
-              <span>Offers</span>
-            </span>
-          </Link>
-          <div className="pt-4 mt-2 border-t border-[var(--card-border)] flex items-center justify-between gap-3">
-            <Link
-              href={isLoggedIn ? "/account" : "/login"}
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#d4af37] py-2 px-3 rounded-lg hover:bg-white/5"
-            >
-              <User className="w-4 h-4 pointer-events-none" />
-              <span>{isLoggedIn && profile?.full_name ? profile.full_name : "Login"}</span>
-            </Link>
-            <Link
-              href="/menu"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-5 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-gold-gradient text-black hover:opacity-90 active:scale-95 transition-all text-center"
-            >
-              Order Now
-            </Link>
-          </div>
-        </div>
-      )}
     </nav>
   );
 }
