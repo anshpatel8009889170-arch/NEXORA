@@ -23,12 +23,12 @@ export default function Navbar() {
     let ticking = false;
 
     const handleScroll = () => {
-      const currentY = window.scrollY;
-      const delta = currentY - lastY;
-      lastY = currentY;
-
       if (!ticking) {
         window.requestAnimationFrame(() => {
+          const currentY = window.scrollY;
+          const delta = currentY - lastY;
+          lastY = currentY;
+
           const headerHeight = navRef.current?.offsetHeight || 80;
 
           if (currentY <= 0) {
