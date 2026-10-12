@@ -1035,8 +1035,11 @@ export default function AdminDashboardPage() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("nexora_admin_user");
       localStorage.removeItem("nexora_admin_role");
+      sessionStorage.clear();
+      window.location.replace("/admin/login");
+    } else {
+      router.push("/admin/login");
     }
-    router.push("/admin/login");
   };
 
   // Status Change Handler

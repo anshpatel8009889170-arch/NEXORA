@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,14 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Security: Clean form on mount and flush credentials
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, []);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +76,8 @@ export default function AdminLoginPage() {
       }
 
       setSuccessMessage("Admin authentication verified! Accessing dashboard...");
+      setEmail("");
+      setPassword("");
       setTimeout(() => {
         router.push("/admin");
       }, 500);
@@ -121,7 +131,7 @@ export default function AdminLoginPage() {
           )}
 
           {/* Form matching user specification */}
-          <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
+          <form onSubmit={handleAdminLogin} autoComplete="off" className="space-y-4 text-left">
             {/* 3-WAY ROLE SELECTOR (Super Admin vs Admin vs Sub-Admin) */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-sub)]">
@@ -188,11 +198,14 @@ export default function AdminLoginPage() {
                 <input
                   type="email"
                   required
+                  name="admin_login_email_identity"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nexora67@gmail.com"
+                  placeholder="Enter administrator email"
                   className="w-full text-xs bg-transparent text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none"
-                  autoComplete="username"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   autoFocus
                 />
               </div>
@@ -228,11 +241,13 @@ export default function AdminLoginPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   required
+                  name="admin_login_password_secret"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
+                  placeholder="Enter administrator password"
                   className="w-full text-xs bg-transparent text-[var(--text-main)] placeholder-[var(--text-sub-light)] focus:outline-none"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
+                  spellCheck={false}
                 />
               </div>
             </div>
