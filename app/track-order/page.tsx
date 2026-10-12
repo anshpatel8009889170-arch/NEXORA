@@ -155,7 +155,7 @@ function TrackOrderContent() {
           .from("orders")
           .select("status")
           .eq("order_number", orderNumber)
-          .single();
+          .maybeSingle();
 
         if (data?.status) {
           setCurrentStatus(data.status as OrderStatus);
