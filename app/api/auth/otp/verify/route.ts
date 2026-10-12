@@ -80,24 +80,32 @@ export async function POST(req: NextRequest) {
 
     // 4. Retrieve or initialize user profile in database
     let profileData: any = null;
+    const rawDigits = formattedPhone.replace(/\D/g, "").slice(-10);
     try {
       const { data } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", verifiedUserId)
+        .or(`id.eq.${verifiedUserId},id.eq.user_${rawDigits},phone.ilike.%${rawDigits}%`)
         .maybeSingle();
       profileData = data;
     } catch {}
 
-    const isNewUser = !profileData || !profileData.full_name || profileData.full_name === "Guest";
-    const userName = profileData?.full_name || "Royal Guest";
+    const hasRealName = Boolean(
+      profileData?.full_name &&
+      profileData.full_name.trim().length > 0 &&
+      profileData.full_name.trim() !== "Guest" &&
+      profileData.full_name.trim() !== "Royal Guest"
+    );
+
+    const isNewUser = !hasRealName;
+    const userName = hasRealName ? profileData.full_name.trim() : "";
 
     if (!profileData) {
       try {
         await supabase.from("profiles").upsert({
           id: verifiedUserId,
           phone: verifiedPhone,
-          full_name: userName,
+          full_name: "", // Leave blank until user provides their genuine name
           role: "customer",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -109,7 +117,7 @@ export async function POST(req: NextRequest) {
     const sessionToken = await createCustomerSessionToken({
       id: verifiedUserId,
       phone: verifiedPhone,
-      name: userName,
+      name: userName || "",
     });
 
     const response = NextResponse.json({
@@ -117,7 +125,7 @@ export async function POST(req: NextRequest) {
       user: {
         id: verifiedUserId,
         phone: verifiedPhone,
-        name: userName,
+        name: userName, // empty string for new user
         role: "customer",
       },
       isNewUser,

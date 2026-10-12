@@ -84,7 +84,21 @@ function LoginContent() {
     setIsSubmitting(false);
 
     if (res.success) {
-      setSuccessMessage(res.message || "Verification code dispatched successfully!");
+      if (res.isRegistered === false) {
+        // New customer detected: align mode to registration
+        setAuthMode("signup");
+        setSuccessMessage("New customer detected! Please enter the OTP to create your account.");
+      } else if (res.isRegistered === true) {
+        // Existing customer detected: align mode to sign in
+        setAuthMode("login");
+        setSuccessMessage(
+          res.registeredName
+            ? `Welcome back, ${res.registeredName}! Enter OTP to sign in.`
+            : "Registered account detected! Enter OTP to sign in."
+        );
+      } else {
+        setSuccessMessage(res.message || "Verification code dispatched successfully!");
+      }
       setStep("otp");
       setTimer(30);
     } else {
@@ -110,18 +124,14 @@ function LoginContent() {
     if (res.success) {
       if (res.isNewUser) {
         setStep("details");
-        if (authMode === "signup") {
-          setSuccessMessage("Phone verified! Enter your name to complete account registration.");
-        } else {
-          setSuccessMessage("New royal patron detected! Please complete your name to continue.");
-        }
+        setSuccessMessage("Phone verified! Enter your full name to complete registration.");
       } else {
         processPendingCartItem();
-        if (authMode === "signup") {
-          setSuccessMessage("Account recognized! Welcome back to NEXORA.");
-        } else {
-          setSuccessMessage("Authentication successful! Welcome to NEXORA.");
-        }
+        setSuccessMessage(
+          profile?.full_name && profile.full_name !== "Guest" && profile.full_name !== "Royal Guest"
+            ? `Welcome back, ${profile.full_name}!`
+            : "Authentication successful! Welcome to NEXORA."
+        );
         setTimeout(() => {
           router.push(redirectPath);
         }, 800);
@@ -172,7 +182,7 @@ function LoginContent() {
 
     if (res.success) {
       processPendingCartItem();
-      setSuccessMessage("Royal profile established! Redirecting to your order...");
+      setSuccessMessage(`Account created successfully! Welcome to NEXORA, ${trimmedName}.`);
       setTimeout(() => {
         router.push(redirectPath);
       }, 800);
@@ -192,8 +202,15 @@ function LoginContent() {
     );
   }
 
-  // ALREADY LOGGED IN VIEW
-  if (isLoggedIn && profile?.full_name) {
+  // ALREADY LOGGED IN VIEW - Only show if user has an authentic name and is not completing details
+  const hasAuthenticName = Boolean(
+    profile?.full_name &&
+    profile.full_name.trim().length > 0 &&
+    profile.full_name.trim() !== "Guest" &&
+    profile.full_name.trim() !== "Royal Guest"
+  );
+
+  if (isLoggedIn && hasAuthenticName && step !== "details") {
     return (
       <div className="max-w-md mx-auto py-12 animate-in fade-in duration-300">
         <div className="p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-2xl text-center space-y-6 gold-glow-sm">

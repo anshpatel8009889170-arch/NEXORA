@@ -129,7 +129,11 @@ export default function Navbar() {
               className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--text-main)] hover:text-[#d4af37] transition-colors px-2 py-1.5"
             >
               <User className="w-4 h-4 text-[#d4af37]" />
-              <span>{isLoggedIn && profile?.full_name ? profile.full_name.split(" ")[0] : "Login"}</span>
+              <span>
+                {isLoggedIn && profile?.full_name && profile.full_name !== "Guest" && profile.full_name !== "Royal Guest"
+                  ? profile.full_name.split(" ")[0]
+                  : "Login"}
+              </span>
             </Link>
 
             {/* Cart Icon Button with Live Count */}

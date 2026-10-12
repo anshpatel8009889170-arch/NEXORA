@@ -240,7 +240,7 @@ function AccountContent() {
                 Customer Authentication
               </span>
               <h1 className="text-2xl font-serif font-bold text-[var(--text-main)]">
-                Royal Guest Login Required
+                Customer Login Required
               </h1>
               <p className="text-xs text-[var(--text-sub)] max-w-sm mx-auto leading-relaxed">
                 Please verify your mobile number with OTP to access your previous dining orders, delivery addresses, and personalized banquet settings.

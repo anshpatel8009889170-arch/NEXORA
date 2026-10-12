@@ -100,7 +100,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (cachedProfile) {
           try {
-            setProfile(JSON.parse(cachedProfile));
+            const p = JSON.parse(cachedProfile);
+            if (p?.full_name && p.full_name !== "Guest" && p.full_name !== "Royal Guest") {
+              setProfile(p);
+            } else {
+              setProfile(null);
+              localStorage.removeItem("nexora-profile");
+            }
           } catch {}
         }
         if (cachedAddress) {
@@ -134,15 +140,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(u);
               localStorage.setItem("nexora-user", JSON.stringify(u));
 
+              const hasAuthName = Boolean(
+                sessionData.user.name &&
+                sessionData.user.name.trim().length > 0 &&
+                sessionData.user.name !== "Guest" &&
+                sessionData.user.name !== "Royal Guest"
+              );
+
               const serverProfile: Profile = {
                 id: sessionData.user.id,
-                full_name: sessionData.user.name || "",
+                full_name: hasAuthName ? sessionData.user.name : "",
                 phone: sessionData.user.phone,
                 role: "customer",
                 created_at: new Date().toISOString(),
               };
               setProfile(serverProfile);
-              localStorage.setItem("nexora-profile", JSON.stringify(serverProfile));
+              if (hasAuthName) {
+                localStorage.setItem("nexora-profile", JSON.stringify(serverProfile));
+              } else {
+                localStorage.removeItem("nexora-profile");
+              }
               serverAuthenticated = true;
             }
           }
@@ -273,7 +290,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Send OTP to phone via Server API & Supabase Auth
-  const sendOtp = async (phoneNumber: string): Promise<{ success: boolean; message?: string; mockOtp?: string }> => {
+  const sendOtp = async (
+    phoneNumber: string
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    mockOtp?: string;
+    isRegistered?: boolean;
+    registeredName?: string | null;
+  }> => {
     const cleaned = phoneNumber.replace(/\D/g, "");
     if (cleaned.length < 10) {
       return { success: false, message: "Please enter a valid 10-digit mobile number." };
@@ -295,6 +320,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           success: true,
           message: data.message || `OTP sent to ${formattedPhone}`,
           mockOtp: data.isSandbox ? "123456" : undefined,
+          isRegistered: data.isRegistered,
+          registeredName: data.registeredName,
         };
       }
 
@@ -346,17 +373,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(authUser);
         localStorage.setItem("nexora-user", JSON.stringify(authUser));
 
+        const hasRealName = Boolean(
+          verifyData.user?.name &&
+          verifyData.user.name.trim().length > 0 &&
+          verifyData.user.name !== "Guest" &&
+          verifyData.user.name !== "Royal Guest"
+        );
+
         const userProfile: Profile = {
           id: verifyData.user.id,
-          full_name: verifyData.user.name || "",
+          full_name: hasRealName ? verifyData.user.name.trim() : "",
           phone: verifyData.user.phone,
           role: "customer",
           created_at: new Date().toISOString(),
         };
         setProfile(userProfile);
-        localStorage.setItem("nexora-profile", JSON.stringify(userProfile));
+        if (hasRealName) {
+          localStorage.setItem("nexora-profile", JSON.stringify(userProfile));
+        } else {
+          localStorage.removeItem("nexora-profile");
+        }
 
-        return { success: true, isNewUser: verifyData.isNewUser };
+        return { success: true, isNewUser: verifyData.isNewUser ?? !hasRealName };
       }
 
       // If server returned an explicit error (e.g. invalid OTP)
@@ -385,7 +423,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq("id", data.user.id)
           .maybeSingle();
 
-        const pName = existingProfile?.full_name && existingProfile.full_name !== "Guest" ? existingProfile.full_name : "";
+        const hasRealName = Boolean(
+          existingProfile?.full_name &&
+          existingProfile.full_name.trim().length > 0 &&
+          existingProfile.full_name !== "Guest" &&
+          existingProfile.full_name !== "Royal Guest"
+        );
+        const pName = hasRealName ? existingProfile.full_name.trim() : "";
         const fallbackProfile: Profile = {
           id: data.user.id,
           full_name: pName,
@@ -394,7 +438,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString(),
         };
         setProfile(fallbackProfile);
-        localStorage.setItem("nexora-profile", JSON.stringify(fallbackProfile));
+        if (hasRealName) {
+          localStorage.setItem("nexora-profile", JSON.stringify(fallbackProfile));
+        } else {
+          localStorage.removeItem("nexora-profile");
+        }
 
         // Sync with server session
         try {
@@ -405,7 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         } catch {}
 
-        return { success: true, isNewUser: !pName };
+        return { success: true, isNewUser: !hasRealName };
       }
 
       return {
@@ -464,6 +512,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("Supabase profile upsert warning:", e);
       }
+
+      // Synchronize session cookie with updated name
+      try {
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: user.id,
+            phone: user.phone,
+            name: trimmed,
+          }),
+        });
+      } catch {}
 
       return { success: true };
     } catch {

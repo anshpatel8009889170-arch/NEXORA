@@ -76,7 +76,7 @@ export async function createCustomerSessionToken(
   const payload: CustomerSession = {
     id: user.id,
     phone: user.phone,
-    name: user.name || "Royal Guest",
+    name: user.name || "",
     role: "customer",
     iat: now,
     exp: now + expirySeconds,

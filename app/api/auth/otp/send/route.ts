@@ -24,9 +24,32 @@ export async function POST(req: NextRequest) {
     }
 
     const formattedPhone = phoneCheck.sanitized;
+    const rawDigits = formattedPhone.replace(/\D/g, "").slice(-10);
     const isProduction = process.env.NODE_ENV === "production";
 
-    // 2. Attempt real Supabase Auth SMS dispatch
+    // 2. Check if this phone number is already registered with a genuine full name
+    let isRegistered = false;
+    let registeredName: string | null = null;
+    try {
+      const supabaseAdmin = createServerClient({ admin: true });
+      const { data: existingProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, phone")
+        .or(`phone.ilike.%${rawDigits}%,id.eq.user_${rawDigits}`)
+        .maybeSingle();
+
+      if (
+        existingProfile?.full_name &&
+        existingProfile.full_name.trim().length > 0 &&
+        existingProfile.full_name.trim() !== "Guest" &&
+        existingProfile.full_name.trim() !== "Royal Guest"
+      ) {
+        isRegistered = true;
+        registeredName = existingProfile.full_name.trim();
+      }
+    } catch {}
+
+    // 3. Attempt real Supabase Auth SMS dispatch
     try {
       const supabase = createServerClient();
       const { error } = await supabase.auth.signInWithOtp({
@@ -36,7 +59,11 @@ export async function POST(req: NextRequest) {
       if (!error) {
         return NextResponse.json({
           success: true,
-          message: `Verification code sent to ${formattedPhone}.`,
+          message: isRegistered
+            ? `Welcome back${registeredName ? `, ${registeredName}` : ""}! Verification code sent to ${formattedPhone}.`
+            : `New account: Verification code sent to ${formattedPhone}.`,
+          isRegistered,
+          registeredName,
         });
       }
 
@@ -58,7 +85,11 @@ export async function POST(req: NextRequest) {
     // Development sandbox mode
     return NextResponse.json({
       success: true,
-      message: `Development mode: OTP dispatched for ${formattedPhone}. (Use demo code 123456)`,
+      message: isRegistered
+        ? `Welcome back${registeredName ? `, ${registeredName}` : ""}! (Use demo code 123456)`
+        : `New account detected! Enter code to verify. (Use demo code 123456)`,
+      isRegistered,
+      registeredName,
       isSandbox: true,
     });
   } catch (err: unknown) {

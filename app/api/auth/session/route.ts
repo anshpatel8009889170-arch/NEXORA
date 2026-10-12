@@ -35,13 +35,20 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
+    const hasAuthenticName = Boolean(
+      profileName &&
+      profileName.trim().length > 0 &&
+      profileName.trim() !== "Guest" &&
+      profileName.trim() !== "Royal Guest"
+    );
+
     return NextResponse.json({
       success: true,
       authenticated: true,
       user: {
         id: session.id,
         phone: session.phone,
-        name: profileName || "Royal Guest",
+        name: hasAuthenticName ? profileName.trim() : "",
         role: "customer",
       },
     });
@@ -64,7 +71,7 @@ export async function POST(req: NextRequest) {
     }
 
     const safeId = sanitizeString(id, 64) || `cust_${Date.now()}`;
-    const safeName = sanitizeString(name, 100) || "Royal Guest";
+    const safeName = (name && name !== "Royal Guest" && name !== "Guest") ? sanitizeString(name, 100) : "";
 
     const token = await createCustomerSessionToken({
       id: safeId,

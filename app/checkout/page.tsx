@@ -163,7 +163,7 @@ export default function CheckoutPage() {
     setAuthSubmitting(false);
 
     if (res.success) {
-      if (res.isNewUser) {
+      if (res.isNewUser || !profile?.full_name || profile.full_name === "Guest" || profile.full_name === "Royal Guest") {
         setAuthStep("name");
         setAuthSuccess("Verified! Please enter your name.");
       } else {
@@ -273,7 +273,10 @@ export default function CheckoutPage() {
             paymentMethod: "cod",
             items: items.map((i) => ({ id: i.menuItem.id, quantity: i.quantity })),
             couponCode: appliedCoupon ? appliedCoupon.code : null,
-            customerName: profile?.full_name || "Royal Guest",
+            customerName:
+              profile?.full_name && profile.full_name !== "Guest" && profile.full_name !== "Royal Guest"
+                ? profile.full_name
+                : nameInput.trim() || "Guest Patron",
             customerPhone: user?.phone || profile?.phone || phoneInput,
             deliveryAddress: fullAddress,
           }),
@@ -308,7 +311,10 @@ export default function CheckoutPage() {
           paymentMethod,
           items: items.map((i) => ({ id: i.menuItem.id, quantity: i.quantity })),
           couponCode: appliedCoupon ? appliedCoupon.code : null,
-          customerName: profile?.full_name || "Royal Guest",
+          customerName:
+            profile?.full_name && profile.full_name !== "Guest" && profile.full_name !== "Royal Guest"
+              ? profile.full_name
+              : nameInput.trim() || "Guest Patron",
           customerPhone: user?.phone || profile?.phone || phoneInput,
           deliveryAddress: fullAddress,
         }),
