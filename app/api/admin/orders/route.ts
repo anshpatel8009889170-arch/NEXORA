@@ -23,21 +23,65 @@ export async function GET(request: NextRequest) {
     const supabase = createServerClient({ admin: true });
     const { data: dbOrders, error } = await supabase
       .from("orders")
-      .select("*")
+      .select("*, order_items(*)")
       .order("created_at", { ascending: false });
 
     if (!error && dbOrders && dbOrders.length > 0) {
+      const formatted = dbOrders.map((o: any) => ({
+        id: o.id,
+        orderNumber: o.order_number,
+        customerName: o.customer_name || "Royal Guest",
+        phone: o.customer_phone || "",
+        items: Array.isArray(o.order_items) && o.order_items.length > 0
+          ? o.order_items.map((it: any) => `${it.name || "Special Dish"} × ${it.quantity}`)
+          : Array.isArray(o.items)
+          ? o.items
+          : ["Gourmet Selection × 1"],
+        total: Number(o.total_amount || o.total || 0),
+        status: o.status || "pending",
+        paymentMethod: o.payment_method === "cod" ? "Cash on Delivery" : "Online (PhonePe / UPI)",
+        paymentStatus: o.payment_status || "pending",
+        time: o.created_at
+          ? new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "Just now",
+        address: o.delivery_address || "Dining Lounge",
+        created_at: o.created_at,
+        order_number: o.order_number,
+        customer_name: o.customer_name,
+        customer_phone: o.customer_phone,
+        total_amount: o.total_amount,
+        delivery_address: o.delivery_address,
+      }));
+
       return NextResponse.json({
         success: true,
-        orders: dbOrders,
+        orders: formatted,
       });
     }
 
     // Fallback to active runtime orders
     const runtime = getRuntimeOrders();
+    const formattedRuntime = runtime.map((o: any) => ({
+      id: o.id,
+      orderNumber: o.order_number || o.orderNumber,
+      customerName: o.customer_name || o.customerName || "Royal Guest",
+      phone: o.customer_phone || o.phone || "",
+      items: Array.isArray(o.items) ? o.items : ["Gourmet Selection × 1"],
+      total: Number(o.total || o.total_amount || 0),
+      status: o.status || "pending",
+      paymentMethod: o.payment_method || o.paymentMethod || "Cash on Delivery",
+      paymentStatus: o.payment_status || o.paymentStatus || "pending",
+      time: o.created_at
+        ? new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "Just now",
+      address: o.delivery_address || o.address || "Dining Lounge",
+      created_at: o.created_at || new Date().toISOString(),
+      order_number: o.order_number,
+    }));
+
     return NextResponse.json({
       success: true,
-      orders: runtime,
+      orders: formattedRuntime,
     });
   } catch (error: any) {
     console.error("GET /api/admin/orders error:", error);

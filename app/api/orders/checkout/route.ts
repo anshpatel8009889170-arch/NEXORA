@@ -91,9 +91,24 @@ export async function POST(req: NextRequest) {
     const supabase = createServerClient({ admin: true });
     const nowIso = new Date().toISOString();
 
+    // Verify foreign key for user_id if logged in
+    let validUserId: string | null = null;
+    if (userId && /^[0-9a-f-]{36}$/i.test(userId)) {
+      try {
+        const { data: profileCheck } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profileCheck?.id) {
+          validUserId = profileCheck.id;
+        }
+      } catch {}
+    }
+
     const orderRecord = {
       order_number: safeOrderNumber,
-      user_id: userId,
+      user_id: validUserId,
       customer_name: safeCustomerName,
       customer_phone: safePhone,
       delivery_type: "delivery",
@@ -107,7 +122,6 @@ export async function POST(req: NextRequest) {
       tax: recalculated.tax,
       total_amount: recalculated.grandTotal,
       total: recalculated.grandTotal,
-      coupon_code: recalculated.couponCode,
       notes: isOnlinePayment
         ? `PhonePe PG Order${merchantTransactionId ? ` (${merchantTransactionId})` : ""}${recalculated.couponCode ? ` (Coupon: ${recalculated.couponCode})` : ""}`
         : recalculated.couponCode
@@ -131,14 +145,19 @@ export async function POST(req: NextRequest) {
         createdOrderId = insertedOrder.id;
         // Insert order_items with foreign key relationship to orders(id)
         if (Array.isArray(recalculated.items) && recalculated.items.length > 0) {
-          const itemRows = recalculated.items.map((item) => ({
-            order_id: createdOrderId,
-            item_name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            unit_price: item.price,
-            total_price: Math.round(item.price * item.quantity),
-          }));
+          const itemRows = recalculated.items.map((item) => {
+            const rowTotal = Math.round(item.price * item.quantity);
+            return {
+              order_id: createdOrderId,
+              menu_item_id: item.id && /^[0-9a-f-]{36}$/i.test(item.id) ? item.id : null,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              unit_price: item.price,
+              total_price: rowTotal,
+              item_total: rowTotal,
+            };
+          });
           const { error: itemsInsertErr } = await supabase
             .from("order_items")
             .insert(itemRows);

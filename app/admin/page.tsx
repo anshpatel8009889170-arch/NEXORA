@@ -66,6 +66,7 @@ import { formatCurrency } from "@/utils/formatters";
 import { OrderStatus, MenuItem, Category, Offer, RestaurantSettings, Review } from "@/types/database";
 import { fallbackMenuItems, fallbackCategories } from "@/lib/menuData";
 import { uploadDishImage } from "@/lib/storage";
+import { supabase } from "@/lib/supabase/client";
 
 type AdminTab =
   | "dashboard"
@@ -1168,6 +1169,57 @@ export default function AdminDashboardPage() {
     }
   }, [adminUser]);
 
+  // Live Orders State & Supabase Realtime Sync
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
+
+  const fetchOrders = async () => {
+    setIsOrdersLoading(true);
+    try {
+      const res = await fetch("/api/admin/orders");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.orders)) {
+        setOrdersList(data.orders);
+      }
+    } catch (err) {
+      console.warn("Error fetching admin orders:", err);
+    } finally {
+      setIsOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+
+    // Supabase Realtime Channel: Instant live push notifications for orders
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel("admin_orders_live_sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "orders" },
+          () => {
+            fetchOrders();
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn("Realtime channel subscription notice:", err);
+    }
+
+    // Resilient 6-second auto-poll
+    const interval = setInterval(() => {
+      fetchOrders();
+    }, 6000);
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+      clearInterval(interval);
+    };
+  }, []);
+
   // Sync live registered customers from /api/admin/customers
   const fetchCustomers = async () => {
     setIsCustomersLoading(true);
@@ -1189,6 +1241,21 @@ export default function AdminDashboardPage() {
       fetchCustomers();
     }
   }, [activeTab]);
+
+  // Dynamic Live Metrics from Real Database Orders
+  const livePendingCount = ordersList.filter((o) => o.status === "pending").length;
+  const liveTotalOrders = ordersList.length;
+  const liveTodayRevenue = ordersList
+    .filter((o) => o.status !== "cancelled")
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const liveDeliveredCount = ordersList.filter((o) => o.status === "delivered").length;
+  const liveInProgressCount = ordersList.filter(
+    (o) =>
+      o.status === "accepted" ||
+      o.status === "preparing" ||
+      o.status === "ready" ||
+      o.status === "out_for_delivery"
+  ).length;
 
   const currentRole = (
     adminUser?.role ||
@@ -1358,7 +1425,7 @@ export default function AdminDashboardPage() {
                             : "bg-[#d4af37]/20 text-[#d4af37]"
                         }`}
                       >
-                        6
+                        {livePendingCount}
                       </span>
                     )}
                   </button>
@@ -1378,16 +1445,13 @@ export default function AdminDashboardPage() {
             ============================================================ */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto">
           {/* ==========================================================
-              TAB: DASHBOARD (MAIN SCREEN MATCHING USER SPECIFICATION)
-              Today's Revenue: ₹12,450
-              Orders: 48
-              Pending: 6
+              TAB: DASHBOARD (MAIN SCREEN WITH LIVE DATABASE METRICS)
               ========================================================== */}
           {activeTab === "dashboard" && (
             <div className="space-y-8 animate-in fade-in duration-200">
-              {/* 3 Core Metric Cards Specified by User */}
+              {/* 3 Core Metric Cards Connected Live to Database */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                {/* 1. Today's Revenue: ₹12,450 */}
+                {/* 1. Today's Revenue */}
                 <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[#d4af37]/30 shadow-xl space-y-3 gold-glow-sm">
                   <div className="flex items-center justify-between text-xs text-[var(--text-sub)]">
                     <span className="uppercase tracking-wider font-semibold">
@@ -1396,14 +1460,14 @@ export default function AdminDashboardPage() {
                     <TrendingUp className="w-4 h-4 text-emerald-400" />
                   </div>
                   <p className="text-3xl sm:text-4xl font-serif font-bold text-gold-gradient">
-                    ₹12,450
+                    {formatCurrency(liveTodayRevenue)}
                   </p>
                   <p className="text-[11px] text-emerald-400 font-medium">
-                    +14.2% higher than yesterday
+                    {liveTotalOrders} live orders recorded
                   </p>
                 </div>
 
-                {/* 2. Orders: 48 */}
+                {/* 2. Total Orders */}
                 <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-xl space-y-3">
                   <div className="flex items-center justify-between text-xs text-[var(--text-sub)]">
                     <span className="uppercase tracking-wider font-semibold">
@@ -1412,14 +1476,14 @@ export default function AdminDashboardPage() {
                     <ShoppingBag className="w-4 h-4 text-[#d4af37]" />
                   </div>
                   <p className="text-3xl sm:text-4xl font-serif font-bold text-[var(--text-main)]">
-                    48
+                    {liveTotalOrders}
                   </p>
                   <p className="text-[11px] text-[var(--text-sub)]">
-                    42 Delivered &bull; 6 In Progress
+                    {liveDeliveredCount} Delivered &bull; {liveInProgressCount} In Progress
                   </p>
                 </div>
 
-                {/* 3. Pending: 6 */}
+                {/* 3. Pending Orders */}
                 <div className="p-6 rounded-3xl bg-[var(--card-bg)] border border-amber-500/30 shadow-xl space-y-3">
                   <div className="flex items-center justify-between text-xs text-[var(--text-sub)]">
                     <span className="uppercase tracking-wider font-semibold text-amber-400">
@@ -1428,10 +1492,10 @@ export default function AdminDashboardPage() {
                     <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
                   </div>
                   <p className="text-3xl sm:text-4xl font-serif font-bold text-amber-400">
-                    6
+                    {livePendingCount}
                   </p>
                   <p className="text-[11px] text-[var(--text-sub)]">
-                    Requires immediate kitchen attention
+                    {livePendingCount > 0 ? "Requires kitchen attention" : "All orders up to date"}
                   </p>
                 </div>
               </div>
@@ -1676,6 +1740,27 @@ export default function AdminDashboardPage() {
               ========================================================== */}
           {activeTab === "orders" && (
             <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-[#d4af37]" />
+                    Live Orders Pipeline
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Real-time kitchen order lifecycle connected directly to cloud database.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchOrders}
+                  disabled={isOrdersLoading}
+                  className="px-3.5 py-2 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-sub)] hover:text-[#d4af37] text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer w-fit"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isOrdersLoading ? "animate-spin text-[#d4af37]" : ""}`} />
+                  <span>Refresh Orders</span>
+                </button>
+              </div>
+
               {/* Lifecycle Breadcrumb Overview */}
               <div className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                 <span className="font-bold text-amber-400">NEW</span>

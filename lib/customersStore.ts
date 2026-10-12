@@ -196,11 +196,35 @@ export async function upsertCustomerProfile(params: {
 
   saveCustomerToStore(record);
 
-  // Sync with Supabase profiles using valid UUID
+  // Sync with Supabase profiles ensuring auth.users relationship
   try {
     const supabase = createServerClient({ admin: true });
+    let authUserId = validUuid;
+
+    try {
+      const { data: usersData } = await supabase.auth.admin.listUsers();
+      const matchedUser = usersData?.users?.find(
+        (u) => u.phone && u.phone.replace(/\D/g, "").slice(-10) === raw
+      );
+      if (matchedUser) {
+        authUserId = matchedUser.id;
+      } else {
+        const { data: createdUser } = await supabase.auth.admin.createUser({
+          phone: `+91${raw}`,
+          phone_confirm: true,
+          user_metadata: { full_name: params.full_name.trim() },
+        });
+        if (createdUser?.user) {
+          authUserId = createdUser.user.id;
+        }
+      }
+    } catch {}
+
+    record.id = authUserId;
+    saveCustomerToStore(record);
+
     await supabase.from("profiles").upsert({
-      id: validUuid,
+      id: authUserId,
       phone: formattedPhone,
       full_name: params.full_name.trim(),
       email: record.email,
