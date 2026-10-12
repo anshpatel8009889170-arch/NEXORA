@@ -44,10 +44,10 @@ export default function MobileBottomNav() {
       isActive: pathname.startsWith("/cart"),
     },
     {
-      href: isLoggedIn ? "/account" : "/track-order",
-      label: isLoggedIn ? "Account" : "Track",
-      icon: isLoggedIn ? User : Clock,
-      isActive: pathname.startsWith("/account") || pathname.startsWith("/track-order"),
+      href: isLoggedIn ? "/account" : "/login",
+      label: "Account",
+      icon: User,
+      isActive: pathname.startsWith("/account") || pathname.startsWith("/login"),
     },
   ];
 

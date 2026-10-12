@@ -7,6 +7,7 @@ import { ShoppingBag, Menu, X, User, Sparkles } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRestaurantSettings } from "@/context/SettingsContext";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,7 +76,10 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Right Action Icons & Buttons */}
-          <div className="hidden md:flex items-center gap-5">
+          <div className="hidden md:flex items-center gap-4">
+            {/* Theme Toggle (Day / Night Mode) */}
+            <ThemeToggle />
+
             {/* Login / Profile Link */}
             <Link
               href={isLoggedIn ? "/account" : "/login"}
@@ -106,18 +110,9 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile Right Controls: Cart & Hamburger Toggle */}
-          <div className="flex md:hidden items-center gap-3">
-            <Link
-              href="/cart"
-              className="relative p-2.5 rounded-full bg-[var(--card-bg)] border border-[#d4af37]/30 active:scale-95 transition-transform"
-              aria-label="View Cart"
-            >
-              <ShoppingBag className="w-5 h-5 text-[#d4af37] pointer-events-none" />
-              <span className="absolute -top-1 -right-1 bg-gold-gradient text-black text-[10px] font-bold min-w-4 h-4 px-1 rounded-full flex items-center justify-center pointer-events-none shadow-md">
-                {totalItems}
-              </span>
-            </Link>
+          {/* Mobile Right Controls: Day/Night Theme Toggle & Hamburger Drawer Menu */}
+          <div className="flex md:hidden items-center gap-2.5">
+            <ThemeToggle />
             <button
               type="button"
               onClick={() => setMobileMenuOpen((prev) => !prev)}

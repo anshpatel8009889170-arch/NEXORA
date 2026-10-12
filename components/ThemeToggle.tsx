@@ -3,7 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeToggle() {
+interface ThemeToggleProps {
+  className?: string;
+}
+
+export default function ThemeToggle({ className = "" }: ThemeToggleProps) {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [mounted, setMounted] = useState(false);
 
@@ -36,38 +40,37 @@ export default function ThemeToggle() {
   };
 
   if (!mounted) {
-    return null;
+    return (
+      <div
+        className={`w-10 h-10 rounded-full border border-[#d4af37]/30 bg-[var(--card-bg)] opacity-40 ${className}`}
+        aria-hidden="true"
+      />
+    );
   }
 
   const isLight = theme === "light";
 
   return (
-    <div className="fixed bottom-5 left-5 z-50 flex items-center group">
-      <button
-        type="button"
-        onClick={toggleTheme}
-        aria-label={
-          isLight
-            ? "Switch to Royal Night Mode"
-            : "Switch to Royal Day Mode (Sunlight Mode)"
-        }
-        className={`w-12 h-12 rounded-full border shadow-2xl backdrop-blur-md active:scale-90 hover:scale-105 transition-all duration-300 cursor-pointer touch-manipulation select-none flex items-center justify-center ${
-          isLight
-            ? "bg-white border-[#b8860b] shadow-xl hover:bg-neutral-50"
-            : "bg-[#141414] border-[#d4af37]/50 hover:border-[#d4af37] gold-glow-sm"
-        }`}
-      >
-        {isLight ? (
-          <Moon className="w-5 h-5 text-[#b8860b] transition-transform duration-300 -rotate-12" />
-        ) : (
-          <Sun className="w-5 h-5 text-[#f5d77f] transition-transform duration-300 hover:rotate-45" />
-        )}
-      </button>
-
-      {/* Floating tooltip on hover (desktop only) */}
-      <span className="pointer-events-none absolute left-full ml-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-[#d4af37] text-[10px] uppercase tracking-wider px-2.5 py-1.5 rounded-lg whitespace-nowrap border border-[#d4af37]/30 shadow-xl hidden md:block">
-        {isLight ? "🌙 Night Mode" : "☀️ Day Mode"}
-      </span>
-    </div>
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={
+        isLight
+          ? "Switch to Royal Night Mode"
+          : "Switch to Royal Day Mode (Sunlight Mode)"
+      }
+      title={isLight ? "Switch to Royal Night Mode" : "Switch to Royal Day Mode"}
+      className={`relative w-10 h-10 rounded-full border shadow-md backdrop-blur-md active:scale-90 hover:scale-105 transition-all duration-300 cursor-pointer touch-manipulation select-none flex items-center justify-center ${
+        isLight
+          ? "bg-white border-[#b8860b]/50 text-[#b8860b] hover:bg-neutral-50 shadow-sm"
+          : "bg-[var(--card-bg)] border-[#d4af37]/40 text-[#f5d77f] hover:border-[#d4af37] gold-glow-sm"
+      } ${className}`}
+    >
+      {isLight ? (
+        <Moon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#b8860b] transition-transform duration-300 -rotate-12" />
+      ) : (
+        <Sun className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#f5d77f] transition-transform duration-300 hover:rotate-45" />
+      )}
+    </button>
   );
 }

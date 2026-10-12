@@ -3,7 +3,6 @@ import "./globals.css";
 // Theme-synced layout
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import ThemeToggle from "@/components/ThemeToggle";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import FloatingCartBar from "@/components/FloatingCartBar";
 import RestaurantJsonLd from "@/components/RestaurantJsonLd";
@@ -121,7 +120,6 @@ export default function RootLayout({
               <FloatingCartBar />
               <Footer />
               <MobileBottomNav />
-              <ThemeToggle />
             </CartProvider>
           </AuthProvider>
         </SettingsProvider>
