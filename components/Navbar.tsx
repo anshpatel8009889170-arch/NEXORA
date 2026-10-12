@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ShoppingBag, User, Sparkles } from "lucide-react";
@@ -14,29 +14,36 @@ export default function Navbar() {
   const { isLoggedIn, profile } = useAuth();
   const { settings } = useRestaurantSettings();
 
-  // Smart Scroll Header: Hide on scroll down, show on scroll up
-  const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const navRef = useRef<HTMLElement>(null);
 
+  // 1:1 Scroll-Bound Header: Moves up and down exactly at the user's scroll speed
   useEffect(() => {
+    let lastY = window.scrollY;
+    let currentTranslateY = 0;
     let ticking = false;
 
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+      const currentY = window.scrollY;
+      const delta = currentY - lastY;
+      lastY = currentY;
 
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          // Near the very top, always show
-          if (currentScrollY < 30) {
-            setIsVisible(true);
-          } else if (currentScrollY > lastScrollY && currentScrollY > 70) {
-            // Scrolling down -> hide navbar
-            setIsVisible(false);
-          } else if (currentScrollY < lastScrollY) {
-            // Scrolling up -> reveal navbar
-            setIsVisible(true);
+          const headerHeight = navRef.current?.offsetHeight || 80;
+
+          if (currentY <= 0) {
+            // At the top of page, always fully visible
+            currentTranslateY = 0;
+          } else {
+            // Delta > 0: Scrolling down -> header moves up by exact delta pixels (towards -headerHeight)
+            // Delta < 0: Scrolling up -> header moves down by exact delta pixels (towards 0)
+            currentTranslateY = Math.max(-headerHeight, Math.min(0, currentTranslateY - delta));
           }
-          setLastScrollY(currentScrollY);
+
+          if (navRef.current) {
+            navRef.current.style.transform = `translateY(${currentTranslateY}px)`;
+          }
+
           ticking = false;
         });
         ticking = true;
@@ -45,13 +52,13 @@ export default function Navbar() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY]);
+  }, []);
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] transition-transform duration-300 ease-in-out ${
-        isVisible ? "translate-y-0" : "-translate-y-full"
-      }`}
+      ref={navRef}
+      className="fixed top-0 left-0 right-0 z-50 bg-[var(--nav-bg)] backdrop-blur-md border-b border-[var(--card-border)] will-change-transform"
+      style={{ transform: "translateY(0px)" }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
