@@ -8,6 +8,7 @@ import {
 import { validatePhone, sanitizeString } from "@/lib/security/validation";
 import { createServerClient } from "@/lib/supabase/server";
 import { findCustomerByPhone, upsertCustomerProfile } from "@/lib/customersStore";
+import { getClientIp, clearRateLimitForIp } from "@/lib/security/rateLimiter";
 
 export async function GET(req: NextRequest) {
   try {
@@ -97,7 +98,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  try {
+    const ip = getClientIp(req);
+    clearRateLimitForIp(ip, "auth_send_otp");
+    clearRateLimitForIp(ip, "auth_verify_otp");
+  } catch {}
+
   const res = NextResponse.json({ success: true, message: "Customer session invalidated." });
   clearCustomerSessionCookie(res);
   return res;

@@ -5,8 +5,19 @@ interface RateLimitRecord {
   resetTime: number;
 }
 
-// In-memory sliding window cache
-const rateLimitStore = new Map<string, RateLimitRecord>();
+// Global in-memory sliding window cache on globalThis
+const globalForRateLimit = globalThis as unknown as {
+  __nexora_rate_limit_store__?: Map<string, RateLimitRecord>;
+};
+
+if (!globalForRateLimit.__nexora_rate_limit_store__) {
+  globalForRateLimit.__nexora_rate_limit_store__ = new Map<string, RateLimitRecord>();
+}
+
+const rateLimitStore = globalForRateLimit.__nexora_rate_limit_store__;
+
+// Reset all existing rate limit blocks upon reload to immediately unblock developers/testers
+rateLimitStore.clear();
 
 // Cleanup expired entries periodically (every 5 minutes)
 if (typeof setInterval !== "undefined") {
@@ -80,17 +91,53 @@ export function getClientIp(req: NextRequest | Request): string {
 }
 
 /**
+ * Resets rate limit records for a specific IP (e.g., when a user signs out).
+ */
+export function clearRateLimitForIp(ip: string, actionKey?: string): void {
+  for (const key of rateLimitStore.keys()) {
+    if (key.includes(ip) && (!actionKey || key.startsWith(actionKey))) {
+      rateLimitStore.delete(key);
+    }
+  }
+}
+
+/**
+ * Wipes all active rate limit records.
+ */
+export function clearAllRateLimits(): void {
+  rateLimitStore.clear();
+}
+
+/**
  * Convenience helper to enforce rate limit on Next.js Route Handlers.
  * Returns a 429 response if limit is exceeded, or null if allowed.
  */
 export function enforceRateLimit(
   req: NextRequest | Request,
   actionKey: string,
-  options: RateLimitOptions
+  options: RateLimitOptions,
+  customIdentifier?: string
 ): NextResponse | null {
   const ip = getClientIp(req);
-  const compositeKey = `${actionKey}:${ip}`;
-  const result = checkRateLimit(compositeKey, options);
+  const isLoopback =
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip === "localhost" ||
+    ip.startsWith("127.") ||
+    ip === "::ffff:127.0.0.1";
+  const isDev = process.env.NODE_ENV !== "production";
+
+  // In local development or loopback testing, use generous limits to prevent developer/tester lockout
+  const effectiveOptions: RateLimitOptions = (isDev || isLoopback)
+    ? {
+        limit: Math.max(options.limit * 20, 120),
+        windowMs: Math.min(options.windowMs, 60 * 1000), // 1-minute window
+      }
+    : options;
+
+  const identifier = customIdentifier ? `${ip}:${customIdentifier}` : ip;
+  const compositeKey = `${actionKey}:${identifier}`;
+  const result = checkRateLimit(compositeKey, effectiveOptions);
 
   if (!result.success) {
     return NextResponse.json(

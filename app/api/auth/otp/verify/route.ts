@@ -10,13 +10,6 @@ import { findCustomerByPhone } from "@/lib/customersStore";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Strict rate limiting to prevent brute-forcing OTPs
-    const rateLimitResponse = enforceRateLimit(req, "auth_verify_otp", {
-      limit: 10,
-      windowMs: 10 * 60 * 1000,
-    });
-    if (rateLimitResponse) return rateLimitResponse;
-
     const body = await req.json();
     const { phone, token } = body;
 
@@ -37,6 +30,19 @@ export async function POST(req: NextRequest) {
     }
 
     const formattedPhone = phoneCheck.sanitized;
+    const rawDigits = formattedPhone.replace(/\D/g, "").slice(-10);
+
+    // 1. Strict rate limiting to prevent brute-forcing OTPs (partitioned by phone number)
+    const rateLimitResponse = enforceRateLimit(
+      req,
+      "auth_verify_otp",
+      {
+        limit: 30,
+        windowMs: 10 * 60 * 1000,
+      },
+      rawDigits
+    );
+    if (rateLimitResponse) return rateLimitResponse;
     const isProduction = process.env.NODE_ENV === "production";
     const supabase = createServerClient({ admin: true });
 

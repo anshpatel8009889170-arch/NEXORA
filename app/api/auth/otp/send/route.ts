@@ -6,13 +6,6 @@ import { findCustomerByPhone } from "@/lib/customersStore";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Rate Limiting to prevent SMS abuse
-    const rateLimitResponse = enforceRateLimit(req, "auth_send_otp", {
-      limit: 6,
-      windowMs: 10 * 60 * 1000,
-    });
-    if (rateLimitResponse) return rateLimitResponse;
-
     const body = await req.json();
     const { phone } = body;
 
@@ -26,6 +19,18 @@ export async function POST(req: NextRequest) {
 
     const formattedPhone = phoneCheck.sanitized;
     const rawDigits = formattedPhone.replace(/\D/g, "").slice(-10);
+
+    // 1. Rate Limiting to prevent SMS abuse (partitioned by phone number)
+    const rateLimitResponse = enforceRateLimit(
+      req,
+      "auth_send_otp",
+      {
+        limit: 20,
+        windowMs: 10 * 60 * 1000,
+      },
+      rawDigits
+    );
+    if (rateLimitResponse) return rateLimitResponse;
     const isProduction = process.env.NODE_ENV === "production";
 
     // 2. Check if this phone number is already registered with a genuine full name
