@@ -65,8 +65,8 @@ interface AuthContextType {
   addSavedAddress: (address: Omit<SavedAddress, "id">) => SavedAddress;
   updateSavedAddress: (id: string, address: Partial<Omit<SavedAddress, "id">>) => void;
   deleteSavedAddress: (id: string) => void;
-  sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; mockOtp?: string }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ success: boolean; message?: string; isNewUser?: boolean }>;
+  sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; mockOtp?: string; isRegistered?: boolean; registeredName?: string | null }>;
+  verifyOtp: (phone: string, token: string) => Promise<{ success: boolean; message?: string; isNewUser?: boolean; userName?: string }>;
   updateProfileName: (fullName: string, email?: string) => Promise<{ success: boolean; message?: string }>;
   saveDeliveryAddress: (address: DeliveryAddressData) => Promise<void>;
   signOut: () => Promise<void>;
@@ -350,7 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyOtp = async (
     phoneNumber: string,
     token: string
-  ): Promise<{ success: boolean; message?: string; isNewUser?: boolean }> => {
+  ): Promise<{ success: boolean; message?: string; isNewUser?: boolean; userName?: string }> => {
     const cleaned = phoneNumber.replace(/\D/g, "");
     const formattedPhone = cleaned.length === 10 ? `+91${cleaned}` : `+${cleaned}`;
     const cleanToken = token.trim();
@@ -394,7 +394,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("nexora-profile");
         }
 
-        return { success: true, isNewUser: verifyData.isNewUser ?? !hasRealName };
+        return {
+          success: true,
+          isNewUser: verifyData.isNewUser ?? !hasRealName,
+          userName: userProfile.full_name,
+        };
       }
 
       // If server returned an explicit error (e.g. invalid OTP)
@@ -513,18 +517,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn("Supabase profile upsert warning:", e);
       }
 
-      // Synchronize session cookie with updated name
+      // Persist profile to authoritative server store & session cookie
       try {
-        await fetch("/api/auth/session", {
+        const profileRes = await fetch("/api/customer/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: user.id,
-            phone: user.phone,
+            phone: user.phone || profile?.phone,
             name: trimmed,
+            email: cleanEmail,
           }),
         });
-      } catch {}
+        const profileData = await profileRes.json();
+        if (profileData.success && profileData.customer) {
+          const freshProfile: Profile = {
+            id: profileData.customer.id,
+            full_name: profileData.customer.full_name,
+            phone: profileData.customer.phone,
+            email: profileData.customer.email,
+            role: "customer",
+            created_at: profileData.customer.created_at,
+          };
+          setProfile(freshProfile);
+          localStorage.setItem("nexora-profile", JSON.stringify(freshProfile));
+        }
+      } catch (err) {
+        console.warn("Notice: could not save profile via /api/customer/profile:", err);
+      }
 
       return { success: true };
     } catch {

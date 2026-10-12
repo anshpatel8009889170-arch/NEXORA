@@ -326,6 +326,12 @@ export default function AdminDashboardPage() {
   const [newPasswordValue, setNewPasswordValue] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
+  // Customer Directory State (Live registered patrons)
+  const [customersList, setCustomersList] = useState<
+    { id: string; name: string; phone: string; email?: string | null; orders: number; tier: string; joined_at?: string }[]
+  >([]);
+  const [isCustomersLoading, setIsCustomersLoading] = useState<boolean>(false);
+
   // Auth Verification & Menu/Category Initialization from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1161,6 +1167,28 @@ export default function AdminDashboardPage() {
         .catch(() => {});
     }
   }, [adminUser]);
+
+  // Sync live registered customers from /api/admin/customers
+  const fetchCustomers = async () => {
+    setIsCustomersLoading(true);
+    try {
+      const res = await fetch("/api/admin/customers");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.customers)) {
+        setCustomersList(data.customers);
+      }
+    } catch (err) {
+      console.warn("Error fetching customers:", err);
+    } finally {
+      setIsCustomersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "customers") {
+      fetchCustomers();
+    }
+  }, [activeTab]);
 
   const currentRole = (
     adminUser?.role ||
@@ -2478,39 +2506,59 @@ export default function AdminDashboardPage() {
               ========================================================== */}
           {activeTab === "customers" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="pb-4 border-b border-[var(--card-border)]">
-                <h2 className="text-xl font-serif font-bold text-[var(--text-main)]">
-                  Registered Customers
-                </h2>
-                <p className="text-xs text-[var(--text-sub)]">
-                  Verified customer directory and dining profiles.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--card-border)]">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#d4af37]" />
+                    Registered Customers
+                  </h2>
+                  <p className="text-xs text-[var(--text-sub)]">
+                    Verified customer directory, dining profiles, and live order records.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchCustomers}
+                  disabled={isCustomersLoading}
+                  className="px-3.5 py-2 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--text-sub)] hover:text-[#d4af37] text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer w-fit"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCustomersLoading ? "animate-spin text-[#d4af37]" : ""}`} />
+                  <span>Refresh</span>
+                </button>
               </div>
 
-              <div className="space-y-3">
-                {[
-                  { name: "Ansh Patel", phone: "+91 83038 90056", orders: 12, tier: "Gold Guest" },
-                  { name: "Vaibhav Patel", phone: "+91 91204 89210", orders: 8, tier: "Gold Guest" },
-                  { name: "Aanya Singhania", phone: "+91 99182 34567", orders: 4, tier: "Regular" },
-                ].map((cust, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between"
-                  >
-                    <div>
-                      <h4 className="text-sm font-semibold text-[var(--text-main)]">
-                        {cust.name}
-                      </h4>
-                      <p className="text-xs text-[var(--text-sub)] font-mono">
-                        {cust.phone} &bull; {cust.orders} Orders placed
-                      </p>
+              {isCustomersLoading && customersList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-[var(--text-sub)] flex items-center justify-center gap-2 bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)]">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#d4af37]" />
+                  <span>Loading registered customers...</span>
+                </div>
+              ) : customersList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-[var(--text-sub)] bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)]">
+                  No registered customers found yet. When patrons log in and register their phone number, they will appear here automatically.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customersList.map((cust, i) => (
+                    <div
+                      key={cust.id || i}
+                      className="p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] flex items-center justify-between transition-all hover:border-[#d4af37]/40"
+                    >
+                      <div>
+                        <h4 className="text-sm font-semibold text-[var(--text-main)]">
+                          {cust.name}
+                        </h4>
+                        <p className="text-xs text-[var(--text-sub)] font-mono">
+                          {cust.phone} &bull; {cust.orders} Orders placed
+                          {cust.email && ` &bull; ${cust.email}`}
+                        </p>
+                      </div>
+                      <span className="text-xs text-[#d4af37] font-semibold">
+                        {cust.tier}
+                      </span>
                     </div>
-                    <span className="text-xs text-[#d4af37] font-semibold">
-                      {cust.tier}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

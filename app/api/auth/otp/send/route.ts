@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/security/rateLimiter";
 import { validatePhone } from "@/lib/security/validation";
 import { createServerClient } from "@/lib/supabase/server";
+import { findCustomerByPhone } from "@/lib/customersStore";
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,21 +32,15 @@ export async function POST(req: NextRequest) {
     let isRegistered = false;
     let registeredName: string | null = null;
     try {
-      const supabaseAdmin = createServerClient({ admin: true });
-      const { data: existingProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("id, full_name, phone")
-        .or(`phone.ilike.%${rawDigits}%,id.eq.user_${rawDigits}`)
-        .maybeSingle();
-
+      const existing = await findCustomerByPhone(formattedPhone);
       if (
-        existingProfile?.full_name &&
-        existingProfile.full_name.trim().length > 0 &&
-        existingProfile.full_name.trim() !== "Guest" &&
-        existingProfile.full_name.trim() !== "Royal Guest"
+        existing?.full_name &&
+        existing.full_name.trim().length > 0 &&
+        existing.full_name.trim() !== "Guest" &&
+        existing.full_name.trim() !== "Royal Guest"
       ) {
         isRegistered = true;
-        registeredName = existingProfile.full_name.trim();
+        registeredName = existing.full_name.trim();
       }
     } catch {}
 

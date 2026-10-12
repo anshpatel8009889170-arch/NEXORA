@@ -6,6 +6,7 @@ import {
   createCustomerSessionToken,
   setCustomerSessionCookie,
 } from "@/lib/security/customerAuth";
+import { findCustomerByPhone } from "@/lib/customersStore";
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,44 +79,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Retrieve or initialize user profile in database
-    let profileData: any = null;
-    const rawDigits = formattedPhone.replace(/\D/g, "").slice(-10);
-    try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .or(`id.eq.${verifiedUserId},id.eq.user_${rawDigits},phone.ilike.%${rawDigits}%`)
-        .maybeSingle();
-      profileData = data;
-    } catch {}
+    // 4. Retrieve or initialize user profile in customer store
+    const customer = await findCustomerByPhone(formattedPhone);
 
     const hasRealName = Boolean(
-      profileData?.full_name &&
-      profileData.full_name.trim().length > 0 &&
-      profileData.full_name.trim() !== "Guest" &&
-      profileData.full_name.trim() !== "Royal Guest"
+      customer?.full_name &&
+      customer.full_name.trim().length > 0 &&
+      customer.full_name.trim() !== "Guest" &&
+      customer.full_name.trim() !== "Royal Guest"
     );
 
     const isNewUser = !hasRealName;
-    const userName = hasRealName ? profileData.full_name.trim() : "";
-
-    if (!profileData) {
-      try {
-        await supabase.from("profiles").upsert({
-          id: verifiedUserId,
-          phone: verifiedPhone,
-          full_name: "", // Leave blank until user provides their genuine name
-          role: "customer",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      } catch {}
-    }
+    const userName = hasRealName ? customer!.full_name.trim() : "";
+    const effectiveUserId = customer?.id || verifiedUserId;
 
     // 5. Issue cryptographic server-side session token
     const sessionToken = await createCustomerSessionToken({
-      id: verifiedUserId,
+      id: effectiveUserId,
       phone: verifiedPhone,
       name: userName || "",
     });
@@ -123,9 +103,9 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       success: true,
       user: {
-        id: verifiedUserId,
+        id: effectiveUserId,
         phone: verifiedPhone,
-        name: userName, // empty string for new user
+        name: userName, // empty string for new user, actual name for registered user
         role: "customer",
       },
       isNewUser,

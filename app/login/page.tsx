@@ -127,10 +127,10 @@ function LoginContent() {
         setSuccessMessage("Phone verified! Enter your full name to complete registration.");
       } else {
         processPendingCartItem();
+        const resolvedName = res.userName || profile?.full_name;
+        const hasName = Boolean(resolvedName && resolvedName !== "Guest" && resolvedName !== "Royal Guest");
         setSuccessMessage(
-          profile?.full_name && profile.full_name !== "Guest" && profile.full_name !== "Royal Guest"
-            ? `Welcome back, ${profile.full_name}!`
-            : "Authentication successful! Welcome to NEXORA."
+          hasName ? `Welcome back, ${resolvedName}!` : "Authentication successful! Welcome to NEXORA."
         );
         setTimeout(() => {
           router.push(redirectPath);
@@ -210,7 +210,7 @@ function LoginContent() {
     profile.full_name.trim() !== "Royal Guest"
   );
 
-  if (isLoggedIn && hasAuthenticName && step !== "details") {
+  if (isLoggedIn && hasAuthenticName && profile && step !== "details") {
     return (
       <div className="max-w-md mx-auto py-12 animate-in fade-in duration-300">
         <div className="p-8 rounded-3xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-2xl text-center space-y-6 gold-glow-sm">

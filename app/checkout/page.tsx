@@ -163,7 +163,7 @@ export default function CheckoutPage() {
     setAuthSubmitting(false);
 
     if (res.success) {
-      if (res.isNewUser || !profile?.full_name || profile.full_name === "Guest" || profile.full_name === "Royal Guest") {
+      if (res.isNewUser || (!res.userName && (!profile?.full_name || profile.full_name === "Guest" || profile.full_name === "Royal Guest"))) {
         setAuthStep("name");
         setAuthSuccess("Verified! Please enter your name.");
       } else {

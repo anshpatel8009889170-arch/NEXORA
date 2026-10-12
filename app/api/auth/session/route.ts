@@ -7,6 +7,7 @@ import {
 } from "@/lib/security/customerAuth";
 import { validatePhone, sanitizeString } from "@/lib/security/validation";
 import { createServerClient } from "@/lib/supabase/server";
+import { findCustomerByPhone, upsertCustomerProfile } from "@/lib/customersStore";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,35 +21,24 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Optionally fetch up-to-date name from database
-    let profileName = session.name;
-    try {
-      const supabase = createServerClient();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", session.id)
-        .maybeSingle();
-
-      if (profile?.full_name) {
-        profileName = profile.full_name;
-      }
-    } catch {}
+    // Fetch up-to-date name from customersStore
+    const customer = await findCustomerByPhone(session.phone);
+    const resolvedName = customer?.full_name || session.name;
 
     const hasAuthenticName = Boolean(
-      profileName &&
-      profileName.trim().length > 0 &&
-      profileName.trim() !== "Guest" &&
-      profileName.trim() !== "Royal Guest"
+      resolvedName &&
+      resolvedName.trim().length > 0 &&
+      resolvedName.trim() !== "Guest" &&
+      resolvedName.trim() !== "Royal Guest"
     );
 
     return NextResponse.json({
       success: true,
       authenticated: true,
       user: {
-        id: session.id,
+        id: customer?.id || session.id,
         phone: session.phone,
-        name: hasAuthenticName ? profileName.trim() : "",
+        name: hasAuthenticName && resolvedName ? resolvedName.trim() : "",
         role: "customer",
       },
     });
@@ -73,8 +63,18 @@ export async function POST(req: NextRequest) {
     const safeId = sanitizeString(id, 64) || `cust_${Date.now()}`;
     const safeName = (name && name !== "Royal Guest" && name !== "Guest") ? sanitizeString(name, 100) : "";
 
+    let effectiveId = safeId;
+    if (safeName) {
+      const saved = await upsertCustomerProfile({
+        id: safeId,
+        phone: phoneResult.sanitized,
+        full_name: safeName,
+      });
+      effectiveId = saved.id;
+    }
+
     const token = await createCustomerSessionToken({
-      id: safeId,
+      id: effectiveId,
       phone: phoneResult.sanitized,
       name: safeName,
     });
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({
       success: true,
       user: {
-        id: safeId,
+        id: effectiveId,
         phone: phoneResult.sanitized,
         name: safeName,
         role: "customer",
