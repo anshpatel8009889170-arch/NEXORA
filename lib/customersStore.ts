@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
 import { createServerClient } from "@/lib/supabase/server";
 
@@ -14,73 +12,14 @@ export interface StoredCustomer {
   updated_at: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const CUSTOMERS_FILE = path.join(DATA_DIR, "customers.json");
-
-// Initial pre-registered patrons for testing
-const INITIAL_CUSTOMERS: StoredCustomer[] = [
-  {
-    id: "e1a2b3c4-0000-4000-a000-000000000001",
-    phone: "+91 83038 90056",
-    raw_phone: "8303890056",
-    full_name: "Vaibhav Patel",
-    email: "vaibhavpatel8543@gmail.com",
-    role: "customer",
-    created_at: "2026-08-01T10:00:00.000Z",
-    updated_at: "2026-08-01T10:00:00.000Z",
-  },
-  {
-    id: "e1a2b3c4-0000-4000-a000-000000000002",
-    phone: "+91 91204 89210",
-    raw_phone: "9120489210",
-    full_name: "Ansh Patel",
-    email: "anshpatel8009889170@gmail.com",
-    role: "customer",
-    created_at: "2026-08-01T10:00:00.000Z",
-    updated_at: "2026-08-01T10:00:00.000Z",
-  },
-];
-
-// In-Memory singleton cache on globalThis
+// In-Memory singleton cache on globalThis (no local file writes)
 const globalForCustomers = globalThis as unknown as {
   __nexora_customers_cache__?: StoredCustomer[];
 };
 
-function readPersistedCustomers(): StoredCustomer[] {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(CUSTOMERS_FILE)) {
-      const content = fs.readFileSync(CUSTOMERS_FILE, "utf8");
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-    // Write defaults if file does not exist
-    fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify(INITIAL_CUSTOMERS, null, 2), "utf8");
-    return [...INITIAL_CUSTOMERS];
-  } catch (err) {
-    console.warn("Notice: could not read customers.json, using in-memory defaults:", err);
-    return [...INITIAL_CUSTOMERS];
-  }
-}
-
-function writePersistedCustomers(customers: StoredCustomer[]): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify(customers, null, 2), "utf8");
-  } catch (err) {
-    console.warn("Notice: could not write customers.json:", err);
-  }
-}
-
 export function getCustomersList(): StoredCustomer[] {
   if (!globalForCustomers.__nexora_customers_cache__) {
-    globalForCustomers.__nexora_customers_cache__ = readPersistedCustomers();
+    globalForCustomers.__nexora_customers_cache__ = [];
   }
   return globalForCustomers.__nexora_customers_cache__;
 }
@@ -93,7 +32,7 @@ export function extractRawPhone(phone: string): string {
 
 /**
  * Searches for a registered customer by matching their 10-digit mobile number.
- * Supabase Cloud PostgreSQL is the PRIMARY source of truth.
+ * 100% DIRECT FROM SUPABASE CLOUD POSTGRESQL.
  */
 export async function findCustomerByPhone(phone: string): Promise<StoredCustomer | undefined> {
   const raw = extractRawPhone(phone);
@@ -102,7 +41,6 @@ export async function findCustomerByPhone(phone: string): Promise<StoredCustomer
   const formatted = `+91 ${raw.slice(0, 5)} ${raw.slice(5)}`;
   const e164 = `+91${raw}`;
 
-  // 1. PRIMARY SOURCE: Supabase Cloud PostgreSQL Profiles
   try {
     const supabase = createServerClient({ admin: true });
     const { data } = await supabase
@@ -118,7 +56,7 @@ export async function findCustomerByPhone(phone: string): Promise<StoredCustomer
       data.full_name !== "Guest" &&
       data.full_name !== "Royal Guest"
     ) {
-      const syncedCustomer: StoredCustomer = {
+      const customer: StoredCustomer = {
         id: data.id,
         phone: data.phone || formatted,
         raw_phone: raw,
@@ -128,25 +66,27 @@ export async function findCustomerByPhone(phone: string): Promise<StoredCustomer
         created_at: data.created_at || new Date().toISOString(),
         updated_at: data.updated_at || new Date().toISOString(),
       };
-      saveCustomerToStore(syncedCustomer);
-      return syncedCustomer;
+
+      // Keep in-memory cache updated
+      saveCustomerToStore(customer);
+      return customer;
     }
   } catch (err) {
-    console.warn("Notice: Supabase profile lookup fallback to cache:", err);
+    console.warn("Supabase profile lookup warning:", err);
   }
 
-  // 2. Secondary fallback: Local cache
+  // Fallback to in-memory cache if network issue
   const list = getCustomersList();
-  const localMatch = list.find((c) => c.raw_phone === raw);
-  if (localMatch && localMatch.full_name && localMatch.full_name !== "Guest" && localMatch.full_name !== "Royal Guest") {
-    return localMatch;
+  const memoryMatch = list.find((c) => c.raw_phone === raw);
+  if (memoryMatch && memoryMatch.full_name && memoryMatch.full_name !== "Guest" && memoryMatch.full_name !== "Royal Guest") {
+    return memoryMatch;
   }
 
   return undefined;
 }
 
 /**
- * Persists customer record into local store and attempts Supabase sync.
+ * Updates in-memory customer cache (no local file writes).
  */
 export function saveCustomerToStore(customer: StoredCustomer): StoredCustomer {
   const list = getCustomersList();
@@ -164,12 +104,13 @@ export function saveCustomerToStore(customer: StoredCustomer): StoredCustomer {
     list.unshift(customer);
   }
 
-  writePersistedCustomers(list);
   return customer;
 }
 
 /**
- * High-level helper to upsert customer registration details into Supabase PostgreSQL.
+ * 100% DIRECT SUPABASE UPSERT:
+ * Creates user in Supabase auth.users and upserts record into Supabase profiles table.
+ * NO local JSON file is written!
  */
 export async function upsertCustomerProfile(params: {
   phone: string;
@@ -184,11 +125,11 @@ export async function upsertCustomerProfile(params: {
 
   let authUserId = params.id && /^[0-9a-f-]{36}$/i.test(params.id) ? params.id : null;
 
-  // 1. PRIMARY: Upsert to Supabase PostgreSQL Cloud
+  // Direct Supabase Cloud PostgreSQL operation
   try {
     const supabase = createServerClient({ admin: true });
 
-    // Check or create auth user in auth.users
+    // Check or create auth user in Supabase auth.users
     const { data: usersData } = await supabase.auth.admin.listUsers();
     const matchedUser = usersData?.users?.find(
       (u) => u.phone && u.phone.replace(/\D/g, "").slice(-10) === raw

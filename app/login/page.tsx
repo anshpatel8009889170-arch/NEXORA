@@ -354,12 +354,12 @@ function LoginContent() {
         <div className="text-center space-y-2">
           <div className="w-14 h-14 mx-auto rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] shadow-inner mb-3">
             {step === "phone" && (authMode === "login" ? <Lock className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />)}
-            {step === "otp" && (authMode === "login" ? <ShieldCheck className="w-6 h-6 text-emerald-400" /> : <UserPlus className="w-6 h-6 text-[#d4af37]" />)}
+            {step === "otp" && <Phone className="w-6 h-6" />}
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[var(--text-main)]">
             {step === "phone" && (authMode === "login" ? "Sign In" : "Create Account")}
-            {step === "otp" && (authMode === "login" ? "Sign In Verification" : "Confirm Registration")}
+            {step === "otp" && "Verify Mobile"}
           </h1>
 
           {step === "phone" && (
@@ -371,32 +371,13 @@ function LoginContent() {
           )}
 
           {step === "otp" && (
-            <div className="space-y-2 pt-1 text-left">
-              {authMode === "login" ? (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <div className="font-semibold text-white">Registered Patron: {detectedUser?.name || "Patron"}</div>
-                      <div className="text-[11px] text-emerald-300/80">Signing into Supabase (+91 {phoneInput})</div>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">Existing</span>
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="font-semibold text-white">New Patron: {firstNameInput} {lastNameInput}</div>
-                      <div className="text-[11px] text-amber-300/80">+91 {phoneInput} &bull; {emailInput || "No email"}</div>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">New</span>
-                </div>
-              )}
-              <p className="text-[11px] text-[var(--text-sub)] text-center pt-1">
-                Enter the 6-digit OTP code. (Testing code:{" "}
+            <div className="space-y-1.5 pt-1 text-center">
+              <p className="text-xs text-[var(--text-sub)] leading-relaxed">
+                Enter the 6-digit verification code sent to{" "}
+                <span className="font-mono text-[var(--text-main)] font-semibold">+91 {phoneInput}</span>.
+              </p>
+              <p className="text-[11px] text-[var(--text-sub-light)]">
+                (Testing code:{" "}
                 <button
                   type="button"
                   onClick={() => setOtpInput("123456")}
