@@ -100,58 +100,102 @@ function TrackOrderContent() {
   const queryOrderId = searchParams.get("orderId");
 
   const [order, setOrder] = useState<TrackedOrder | null>(null);
-  const [currentStatus, setCurrentStatus] = useState<OrderStatus>("preparing");
+  const [currentStatus, setCurrentStatus] = useState<OrderStatus>("pending");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(true);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(true);
+  const [searchOrderId, setSearchOrderId] = useState("");
 
-  // Load Order Initial State
+  // Load Order Initial State (100% Direct from Supabase Database)
   useEffect(() => {
-    let orderNum = queryOrderId || "ORD-1048";
-
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("nexora_last_order");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (!queryOrderId || parsed.orderNumber === queryOrderId) {
-            orderNum = parsed.orderNumber;
-            setOrder(parsed);
-            if (parsed.status) {
-              setCurrentStatus(parsed.status);
+      const admin = localStorage.getItem("nexora_admin_user");
+      if (admin) setIsAdminUser(true);
+    }
+
+    const orderNum =
+      queryOrderId ||
+      (typeof window !== "undefined"
+        ? (() => {
+            try {
+              const stored = localStorage.getItem("nexora_last_order");
+              return stored ? JSON.parse(stored)?.orderNumber : null;
+            } catch {
+              return null;
             }
-          }
-        } catch {
-          // ignore parsing error
+          })()
+        : null);
+
+    if (!orderNum) {
+      setIsLoadingOrder(false);
+      return;
+    }
+
+    const fetchOrderData = async () => {
+      setIsLoadingOrder(true);
+      try {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*, order_items(*)")
+          .eq("order_number", orderNum)
+          .maybeSingle();
+
+        if (!error && data) {
+          setOrder({
+            orderNumber: data.order_number,
+            status: data.status as OrderStatus,
+            items:
+              Array.isArray(data.order_items) && data.order_items.length > 0
+                ? data.order_items.map((it: any) => ({
+                    name: it.name,
+                    quantity: it.quantity,
+                    price: Number(it.price || it.item_total || 0),
+                  }))
+                : [],
+            total: Number(data.total_amount || data.total || 0),
+            address: data.delivery_address || "NEXORA Dining Lounge",
+            paymentMethod:
+              data.payment_method === "cod" ? "Cash on Delivery" : "Online (PhonePe / UPI)",
+            isPaid: data.payment_status === "paid",
+            createdAt: data.created_at,
+          });
+          setCurrentStatus(data.status as OrderStatus);
+          setIsLoadingOrder(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Supabase track order notice:", err);
+      }
+
+      // Fallback to local session storage if database record is still syncing
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("nexora_last_order");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.orderNumber === orderNum || !queryOrderId) {
+              setOrder(parsed);
+              if (parsed.status) setCurrentStatus(parsed.status);
+            }
+          } catch {}
         }
       }
-    }
+      setIsLoadingOrder(false);
+    };
 
-    if (!order) {
-      setOrder({
-        orderNumber: orderNum,
-        status: "preparing",
-        address: "Home: Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe And Janseva Kendra",
-        items: [
-          { name: "Truffle Malai Paneer Tikka", quantity: 2, price: 440 },
-          { name: "NEXORA Royal Dal Bukhara", quantity: 1, price: 470 },
-        ],
-        total: 1350,
-        isPaid: true,
-        paymentMethod: "online",
-        createdAt: new Date().toISOString(),
-      });
-    }
+    fetchOrderData();
   }, [queryOrderId]);
 
   // Supabase Realtime Subscription + Auto Polling
   useEffect(() => {
-    const orderNumber = order?.orderNumber || queryOrderId || "ORD-1048";
+    const orderNumber = order?.orderNumber || queryOrderId;
+    if (!orderNumber) return;
 
-    // 1. Initial fetch from Supabase if recorded
+    // 1. Initial fetch from Supabase
     const fetchRemoteStatus = async () => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("orders")
           .select("status")
           .eq("order_number", orderNumber)
@@ -186,7 +230,7 @@ function TrackOrderContent() {
       )
       .subscribe();
 
-    // 3. Fallback Interval Polling every 5 seconds (ensures instant sync even without cloud websocket)
+    // 3. Fallback Interval Polling every 5 seconds
     const interval = setInterval(fetchRemoteStatus, 5000);
 
     return () => {
@@ -197,12 +241,12 @@ function TrackOrderContent() {
 
   // Admin Status Update Trigger
   const handleAdminUpdateStatus = async (newStatus: OrderStatus) => {
+    if (!order?.orderNumber) return;
     setIsUpdatingStatus(true);
     setCurrentStatus(newStatus);
 
-    const orderNumber = order?.orderNumber || "ORD-1048";
+    const orderNumber = order.orderNumber;
 
-    // Update local storage so refreshes keep it
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("nexora_last_order");
       if (stored) {
@@ -248,17 +292,17 @@ function TrackOrderContent() {
           <span className="text-[#d4af37] font-medium">Track Order</span>
         </div>
 
-        {/* Page Header matching user: Order #1048 */}
+        {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-8 border-b border-[var(--card-border)]">
           <div>
             <span className="text-xs uppercase tracking-[0.25em] text-[#d4af37] font-semibold">
               Customer Live Tracker
             </span>
             <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[var(--text-main)] pt-1">
-              Order #{order?.orderNumber?.replace(/^ORD-/, "") || "1048"}
+              {order ? `Order #${order.orderNumber.replace(/^ORD-/, "")}` : "Live Order Tracker"}
             </h1>
             <p className="text-xs text-[var(--text-sub)] pt-1 font-mono">
-              Full ID: {order?.orderNumber || "ORD-1048"}
+              {order ? `Full ID: ${order.orderNumber}` : "Real-time kitchen & delivery status"}
             </p>
           </div>
 
@@ -274,8 +318,44 @@ function TrackOrderContent() {
           </div>
         </div>
 
-        {/* 2-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-8">
+        {/* Order Details or Search Form */}
+        {!order && !isLoadingOrder ? (
+          <div className="py-16 text-center space-y-6 max-w-lg mx-auto">
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37]">
+              <UtensilsCrossed className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-serif font-bold text-[var(--text-main)]">Track Your Royal Feast</h2>
+              <p className="text-xs text-[var(--text-sub)]">
+                Enter your Order ID (from checkout confirmation or SMS receipt) to track real-time kitchen progress and delivery status.
+              </p>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (searchOrderId.trim()) {
+                  window.location.href = `/track-order?orderId=${encodeURIComponent(searchOrderId.trim())}`;
+                }
+              }}
+              className="flex gap-2"
+            >
+              <input
+                type="text"
+                value={searchOrderId}
+                onChange={(e) => setSearchOrderId(e.target.value)}
+                placeholder="Enter Order Number (e.g. ORD-1234)"
+                className="flex-1 px-4 py-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] text-sm text-[var(--text-main)] focus:outline-none focus:border-[#d4af37]"
+              />
+              <button
+                type="submit"
+                className="px-6 py-3 rounded-xl bg-gold-gradient text-black font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all shadow-md cursor-pointer"
+              >
+                Track
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-8">
           {/* ==========================================================
               LEFT COLUMN: PHASE 14 TIMELINE TRACKER (lg:col-span-7)
               ========================================================== */}
@@ -551,6 +631,7 @@ function TrackOrderContent() {
             </div>
           </div>
         </div>
+        )}
       </main>
 
       {/* Customer Review Modal */}
@@ -561,49 +642,48 @@ function TrackOrderContent() {
         defaultDishName={order?.items?.[0]?.name}
       />
 
-      {/* ==============================================================
-          ADMIN STATUS CONTROLLER (SIMULATOR & REAL-TIME CONTROLLER)
-          "Admin status change karega. Customer automatically updated status dekhega."
-          ============================================================== */}
-      <aside className="fixed bottom-0 inset-x-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[#d4af37]/40 shadow-2xl p-3 z-40">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-6 h-6 rounded-lg bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37]">
-              <Sliders className="w-3.5 h-3.5" />
+      {/* Admin Status Controller (Visible Only When Authenticated Administrator Is Logged In) */}
+      {isAdminUser && (
+        <aside className="fixed bottom-0 inset-x-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[#d4af37]/40 shadow-2xl p-3 z-40">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-6 h-6 rounded-lg bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37]">
+                <Sliders className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <span className="font-bold text-[var(--text-main)] uppercase tracking-wider">
+                  Admin Status Controller
+                </span>
+                <p className="text-[10px] text-[var(--text-sub)]">
+                  Live real-time customer timeline sync
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="font-bold text-[var(--text-main)] uppercase tracking-wider">
-                Admin Status Controller
-              </span>
-              <p className="text-[10px] text-[var(--text-sub)]">
-                Click any step to test live real-time customer timeline sync
-              </p>
-            </div>
-          </div>
 
-          {/* Quick Status Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {TRACKING_STAGES.map((s) => {
-              const isActive = currentStatus === s.key;
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  disabled={isUpdatingStatus}
-                  onClick={() => handleAdminUpdateStatus(s.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-gold-gradient text-black shadow-md font-bold scale-105"
-                      : "bg-[var(--section-alt)] text-[var(--text-sub)] border border-[var(--card-border)] hover:border-[#d4af37] hover:text-[var(--text-main)]"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
+            {/* Quick Status Buttons */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {TRACKING_STAGES.map((s) => {
+                const isActive = currentStatus === s.key;
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={() => handleAdminUpdateStatus(s.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? "bg-gold-gradient text-black shadow-md font-bold scale-105"
+                        : "bg-[var(--section-alt)] text-[var(--text-sub)] border border-[var(--card-border)] hover:border-[#d4af37] hover:text-[var(--text-main)]"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
     </div>
   );
 }

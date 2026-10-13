@@ -161,61 +161,8 @@ export default function AdminDashboardPage() {
 
   const [orderFilter, setOrderFilter] = useState<string>("all");
 
-  // Sample Live Orders for Management (Matching Phase 18 specifications)
-  const [ordersList, setOrdersList] = useState<AdminOrder[]>([
-    {
-      id: "ord_1048",
-      orderNumber: "ORD-1048",
-      customerName: "Ansh Patel",
-      phone: "+91 83038 90056",
-      items: ["2 × Biryani", "1 × Paneer Tikka"],
-      total: 847,
-      status: "pending",
-      paymentMethod: "Online (PhonePe / UPI)",
-      paymentStatus: "paid",
-      time: "Just now",
-      address: "Sathigva, Amauli-Fatehpur Road, Near Ankit Internet Cafe",
-    },
-    {
-      id: "ord_2",
-      orderNumber: "ORD-1047",
-      customerName: "Vaibhav Patel",
-      phone: "+91 91204 89210",
-      items: ["Burrata & Truffle Funghi Pizza × 1", "24K Gold Saffron Shahi Tukda × 2"],
-      total: 1250,
-      status: "preparing",
-      paymentMethod: "Cash on Delivery",
-      paymentStatus: "pending",
-      time: "8 mins ago",
-      address: "Main Market Commercial Plaza, Amauli Road",
-    },
-    {
-      id: "ord_3",
-      orderNumber: "ORD-1046",
-      customerName: "Rohit Verma",
-      phone: "+91 98765 43210",
-      items: ["NEXORA Royal Dal Bukhara × 2", "Garlic Naan × 4"],
-      total: 1140,
-      status: "ready",
-      paymentMethod: "Online (UPI)",
-      paymentStatus: "paid",
-      time: "18 mins ago",
-      address: "Station Road, Amauli",
-    },
-    {
-      id: "ord_4",
-      orderNumber: "ORD-1045",
-      customerName: "Aanya Singhania",
-      phone: "+91 99182 34567",
-      items: ["24K Gold Saffron Shahi Tukda × 1"],
-      total: 380,
-      status: "delivered",
-      paymentMethod: "Online (Card)",
-      paymentStatus: "paid",
-      time: "42 mins ago",
-      address: "Civil Lines, Fatehpur",
-    },
-  ]);
+  // Live Orders Management State (100% Direct from Supabase Database)
+  const [ordersList, setOrdersList] = useState<AdminOrder[]>([]);
 
   // ==========================================================
   // PHASE 19 & 20: ADMIN MENU & CATEGORY MANAGEMENT STATE & PERSISTENCE
@@ -1049,7 +996,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Status Change Handler
+  // Status Change Handler (Direct to Supabase with Realtime Live Sync)
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     setOrdersList((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
@@ -1058,7 +1005,7 @@ export default function AdminDashboardPage() {
     const targetOrder = ordersList.find((o) => o.id === orderId);
     if (targetOrder) {
       try {
-        await fetch("/api/orders/update-status", {
+        const res = await fetch("/api/orders/update-status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1066,8 +1013,15 @@ export default function AdminDashboardPage() {
             status: newStatus,
           }),
         });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          console.warn("Status update notification:", data?.error);
+        }
+        // Immediately refresh orders from Supabase to keep state authoritative
+        fetchOrders();
       } catch (err) {
         console.warn("Status sync notice:", err);
+        fetchOrders();
       }
     }
   };
@@ -1598,13 +1552,6 @@ export default function AdminDashboardPage() {
                       <p className="text-xs text-[var(--text-sub)]">
                         No pending new orders. All orders have been accepted!
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateOrderStatus("ord_1048", "pending")}
-                        className="text-xs text-[#d4af37] hover:underline"
-                      >
-                        Reset Demo #1048 to New
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1946,6 +1893,17 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
                   ))}
+
+                {ordersList.filter((o) => orderFilter === "all" || o.status === orderFilter).length === 0 && (
+                  <div className="py-12 text-center rounded-2xl bg-[var(--card-bg)] border border-dashed border-[var(--card-border)] space-y-2">
+                    <p className="text-sm font-medium text-[var(--text-main)]">No orders found</p>
+                    <p className="text-xs text-[var(--text-sub)]">
+                      {orderFilter === "all"
+                        ? "No orders have been placed yet."
+                        : `No orders currently in '${orderFilter.replace(/_/g, " ")}' status.`}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

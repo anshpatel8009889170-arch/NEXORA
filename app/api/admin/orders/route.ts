@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .select("*, order_items(*)")
       .order("created_at", { ascending: false });
 
-    if (!error && dbOrders && dbOrders.length > 0) {
+    if (!error && Array.isArray(dbOrders)) {
       const formatted = dbOrders.map((o: any) => ({
         id: o.id,
         orderNumber: o.order_number,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fallback to active runtime orders
+    // Secondary fallback only if remote database was unreachable
     const runtime = getRuntimeOrders();
     const formattedRuntime = runtime.map((o: any) => ({
       id: o.id,

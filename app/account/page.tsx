@@ -105,7 +105,11 @@ function AccountContent() {
       // 1. Fetch user's genuine orders from Supabase database
       async function fetchCustomerOrders() {
         try {
-          let query = supabase.from("orders").select("*").order("created_at", { ascending: false });
+          let query = supabase
+            .from("orders")
+            .select("*, order_items(*)")
+            .order("created_at", { ascending: false });
+
           if (user?.id && !user.id.startsWith("user_")) {
             query = query.eq("user_id", user.id);
           } else if (user?.phone || profile?.phone) {
@@ -115,12 +119,19 @@ function AccountContent() {
           if (!error && Array.isArray(data) && data.length > 0) {
             const mapped: AccountOrder[] = data.map((o) => ({
               orderNumber: o.order_number?.replace(/^ORD-/, "") || o.id,
-              items: Array.isArray(o.items)
-                ? o.items.map((it: any) => `${it.name || "Delicacy"} × ${it.quantity || 1}`)
-                : ["Royal Banquet Gourmet Delicacy"],
+              items:
+                Array.isArray(o.order_items) && o.order_items.length > 0
+                  ? o.order_items.map((it: any) => `${it.name || "Delicacy"} × ${it.quantity || 1}`)
+                  : Array.isArray(o.items)
+                  ? o.items.map((it: any) => `${it.name || "Delicacy"} × ${it.quantity || 1}`)
+                  : ["Gourmet Delicacy × 1"],
               total: o.total_amount || o.total || 0,
-              status: (o.status ? (o.status.charAt(0).toUpperCase() + o.status.slice(1).replace(/_/g, " ")) : "Pending") as any,
-              date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric" }) : "Recent",
+              status: (o.status
+                ? o.status.charAt(0).toUpperCase() + o.status.slice(1).replace(/_/g, " ")
+                : "Pending") as any,
+              date: o.created_at
+                ? new Date(o.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+                : "Recent",
             }));
             setOrders(mapped);
             return;
@@ -132,18 +143,20 @@ function AccountContent() {
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            const shortNum = parsed.orderNumber?.replace(/^ORD-/, "") || "1049";
-            setOrders([
-              {
-                orderNumber: shortNum,
-                items: parsed.items?.map((i: any) => `${i.name} × ${i.quantity}`) || [
-                  "Gourmet Selection",
-                ],
-                total: parsed.total || 0,
-                status: "Preparing",
-                date: "Just now",
-              },
-            ]);
+            if (parsed.orderNumber) {
+              const shortNum = parsed.orderNumber.replace(/^ORD-/, "");
+              setOrders([
+                {
+                  orderNumber: shortNum,
+                  items: parsed.items?.map((i: any) => `${i.name} × ${i.quantity}`) || [
+                    "Gourmet Selection",
+                  ],
+                  total: parsed.total || 0,
+                  status: "Preparing",
+                  date: "Just now",
+                },
+              ]);
+            }
           } catch {}
         }
       }

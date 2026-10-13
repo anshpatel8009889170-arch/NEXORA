@@ -541,8 +541,45 @@ async function runAdminTests() {
     }
     recordResult("Admin", "Login", true, "Authenticated with secure owner credentials, session cookie obtained");
 
-    // Initialize/reset test orders to pending state with owner override policy for clean test pipeline
+    // Initialize live test orders in Supabase via checkout API for clean test pipeline
     if (adminCookie) {
+      await fetch(`${BASE_URL}/api/orders/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber: "NEX-1048",
+          paymentMethod: "cod",
+          items: [{ id: "awadhi-biryani", quantity: 1 }],
+          customerName: "Vaibhav Patel",
+          customerPhone: "+91 83038 90056",
+          deliveryAddress: "Sathigva, Amauli Road",
+        }),
+      });
+      await fetch(`${BASE_URL}/api/orders/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber: "NEX-1049",
+          paymentMethod: "cod",
+          items: [{ id: "truffle-chaap", quantity: 1 }],
+          customerName: "Ansh Patel",
+          customerPhone: "+91 91204 89210",
+          deliveryAddress: "Amauli-Fatehpur Road",
+        }),
+      });
+      await fetch(`${BASE_URL}/api/orders/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber: "ORD-1047",
+          paymentMethod: "cod",
+          items: [{ id: "dal-bukhara", quantity: 1 }],
+          customerName: "Rohit Verma",
+          customerPhone: "+91 98765 43210",
+          deliveryAddress: "Station Road, Amauli",
+        }),
+      });
+
       await fetch(`${BASE_URL}/api/orders/update-status`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Cookie: adminCookie },
@@ -557,11 +594,6 @@ async function runAdminTests() {
         method: "POST",
         headers: { "Content-Type": "application/json", Cookie: adminCookie },
         body: JSON.stringify({ orderNumber: "ORD-1047", status: "preparing", overridePolicy: true }),
-      });
-      await fetch(`${BASE_URL}/api/orders/update-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Cookie: adminCookie },
-        body: JSON.stringify({ orderNumber: "ORD-1048", status: "pending", overridePolicy: true }),
       });
     }
   } catch (err) {

@@ -105,14 +105,19 @@ export async function POST(req: NextRequest) {
       } else if (insertedOrder?.id) {
         createdOrderId = insertedOrder.id;
         if (Array.isArray(recalculated.items) && recalculated.items.length > 0) {
-          const itemRows = recalculated.items.map((item) => ({
-            order_id: createdOrderId,
-            item_name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            unit_price: item.price,
-            total_price: Math.round(item.price * item.quantity),
-          }));
+          const itemRows = recalculated.items.map((item) => {
+            const rowTotal = Math.round(item.price * item.quantity);
+            return {
+              order_id: createdOrderId,
+              menu_item_id: item.id && /^[0-9a-f-]{36}$/i.test(item.id) ? item.id : null,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              unit_price: item.price,
+              total_price: rowTotal,
+              item_total: rowTotal,
+            };
+          });
           await supabase.from("order_items").insert(itemRows);
         }
       }
