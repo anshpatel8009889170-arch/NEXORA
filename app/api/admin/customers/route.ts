@@ -11,10 +11,10 @@ export async function GET(req: NextRequest) {
       return auth.response;
     }
 
-    const customers = [...getCustomersList()];
+    let customers: any[] = [];
     let orders = getRuntimeOrders();
 
-    // Attempt to merge from Supabase if online
+    // 1. PRIMARY: Query Supabase Cloud PostgreSQL profiles
     try {
       const supabase = createServerClient({ admin: true });
       const { data: dbProfiles } = await supabase
@@ -26,19 +26,16 @@ export async function GET(req: NextRequest) {
         for (const p of dbProfiles) {
           if (!p.full_name || p.full_name === "Guest" || p.full_name === "Royal Guest") continue;
           const raw = extractRawPhone(p.phone || "");
-          const existing = customers.find((c) => (raw && c.raw_phone === raw) || c.id === p.id);
-          if (!existing) {
-            customers.push({
-              id: p.id,
-              phone: p.phone || `+91 ${raw}`,
-              raw_phone: raw,
-              full_name: p.full_name,
-              email: p.email || null,
-              role: "customer",
-              created_at: p.created_at || new Date().toISOString(),
-              updated_at: p.updated_at || new Date().toISOString(),
-            });
-          }
+          customers.push({
+            id: p.id,
+            phone: p.phone || `+91 ${raw}`,
+            raw_phone: raw,
+            full_name: p.full_name,
+            email: p.email || null,
+            role: "customer",
+            created_at: p.created_at || new Date().toISOString(),
+            updated_at: p.updated_at || new Date().toISOString(),
+          });
         }
       }
 
@@ -49,7 +46,12 @@ export async function GET(req: NextRequest) {
         orders = dbOrders as any;
       }
     } catch {
-      // Remote DB offline fallback is fine
+      // Remote DB offline fallback
+    }
+
+    // 2. Secondary fallback if Supabase had zero profiles
+    if (customers.length === 0) {
+      customers = [...getCustomersList()];
     }
 
     // Map order counts and dining tiers dynamically

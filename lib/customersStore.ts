@@ -93,25 +93,22 @@ export function extractRawPhone(phone: string): string {
 
 /**
  * Searches for a registered customer by matching their 10-digit mobile number.
+ * Supabase Cloud PostgreSQL is the PRIMARY source of truth.
  */
 export async function findCustomerByPhone(phone: string): Promise<StoredCustomer | undefined> {
   const raw = extractRawPhone(phone);
   if (!raw || raw.length < 10) return undefined;
 
-  // 1. Check local persistent store
-  const list = getCustomersList();
-  const localMatch = list.find((c) => c.raw_phone === raw);
-  if (localMatch && localMatch.full_name && localMatch.full_name !== "Guest" && localMatch.full_name !== "Royal Guest") {
-    return localMatch;
-  }
+  const formatted = `+91 ${raw.slice(0, 5)} ${raw.slice(5)}`;
+  const e164 = `+91${raw}`;
 
-  // 2. Fallback check remote Supabase profiles if available
+  // 1. PRIMARY SOURCE: Supabase Cloud PostgreSQL Profiles
   try {
     const supabase = createServerClient({ admin: true });
     const { data } = await supabase
       .from("profiles")
       .select("id, full_name, phone, email, role, created_at, updated_at")
-      .or(`phone.ilike.%${raw}%`)
+      .or(`phone.eq.${formatted},phone.eq.${e164},phone.eq.${raw},phone.ilike.%${raw.slice(0, 5)}%${raw.slice(5)}%`)
       .maybeSingle();
 
     if (
@@ -122,8 +119,8 @@ export async function findCustomerByPhone(phone: string): Promise<StoredCustomer
       data.full_name !== "Royal Guest"
     ) {
       const syncedCustomer: StoredCustomer = {
-        id: data.id || crypto.randomUUID(),
-        phone: data.phone || `+91 ${raw.slice(0, 5)} ${raw.slice(5)}`,
+        id: data.id,
+        phone: data.phone || formatted,
         raw_phone: raw,
         full_name: data.full_name.trim(),
         email: data.email || null,
@@ -134,9 +131,18 @@ export async function findCustomerByPhone(phone: string): Promise<StoredCustomer
       saveCustomerToStore(syncedCustomer);
       return syncedCustomer;
     }
-  } catch {}
+  } catch (err) {
+    console.warn("Notice: Supabase profile lookup fallback to cache:", err);
+  }
 
-  return localMatch;
+  // 2. Secondary fallback: Local cache
+  const list = getCustomersList();
+  const localMatch = list.find((c) => c.raw_phone === raw);
+  if (localMatch && localMatch.full_name && localMatch.full_name !== "Guest" && localMatch.full_name !== "Royal Guest") {
+    return localMatch;
+  }
+
+  return undefined;
 }
 
 /**
@@ -163,7 +169,7 @@ export function saveCustomerToStore(customer: StoredCustomer): StoredCustomer {
 }
 
 /**
- * High-level helper to upsert customer registration details.
+ * High-level helper to upsert customer registration details into Supabase PostgreSQL.
  */
 export async function upsertCustomerProfile(params: {
   phone: string;
@@ -173,67 +179,60 @@ export async function upsertCustomerProfile(params: {
 }): Promise<StoredCustomer> {
   const raw = extractRawPhone(params.phone);
   const formattedPhone = `+91 ${raw.slice(0, 5)} ${raw.slice(5)}`;
+  const e164 = `+91${raw}`;
   const nowIso = new Date().toISOString();
 
-  // Find existing or generate valid UUID
-  const existing = await findCustomerByPhone(params.phone);
-  const validUuid = existing?.id && /^[0-9a-f-]{36}$/i.test(existing.id)
-    ? existing.id
-    : params.id && /^[0-9a-f-]{36}$/i.test(params.id)
-    ? params.id
-    : crypto.randomUUID();
+  let authUserId = params.id && /^[0-9a-f-]{36}$/i.test(params.id) ? params.id : null;
 
+  // 1. PRIMARY: Upsert to Supabase PostgreSQL Cloud
+  try {
+    const supabase = createServerClient({ admin: true });
+
+    // Check or create auth user in auth.users
+    const { data: usersData } = await supabase.auth.admin.listUsers();
+    const matchedUser = usersData?.users?.find(
+      (u) => u.phone && u.phone.replace(/\D/g, "").slice(-10) === raw
+    );
+
+    if (matchedUser) {
+      authUserId = matchedUser.id;
+    } else {
+      const { data: createdUser } = await supabase.auth.admin.createUser({
+        phone: e164,
+        phone_confirm: true,
+        user_metadata: { full_name: params.full_name.trim() },
+      });
+      if (createdUser?.user) {
+        authUserId = createdUser.user.id;
+      }
+    }
+
+    if (authUserId) {
+      await supabase.from("profiles").upsert({
+        id: authUserId,
+        phone: formattedPhone,
+        full_name: params.full_name.trim(),
+        email: params.email?.trim() || null,
+        role: "customer",
+        updated_at: nowIso,
+      });
+    }
+  } catch (err) {
+    console.warn("Supabase profile save notice:", err);
+  }
+
+  const finalId = authUserId || params.id || crypto.randomUUID();
   const record: StoredCustomer = {
-    id: validUuid,
+    id: finalId,
     phone: formattedPhone,
     raw_phone: raw,
     full_name: params.full_name.trim(),
-    email: params.email?.trim() || existing?.email || null,
+    email: params.email?.trim() || null,
     role: "customer",
-    created_at: existing?.created_at || nowIso,
+    created_at: nowIso,
     updated_at: nowIso,
   };
 
   saveCustomerToStore(record);
-
-  // Sync with Supabase profiles ensuring auth.users relationship
-  try {
-    const supabase = createServerClient({ admin: true });
-    let authUserId = validUuid;
-
-    try {
-      const { data: usersData } = await supabase.auth.admin.listUsers();
-      const matchedUser = usersData?.users?.find(
-        (u) => u.phone && u.phone.replace(/\D/g, "").slice(-10) === raw
-      );
-      if (matchedUser) {
-        authUserId = matchedUser.id;
-      } else {
-        const { data: createdUser } = await supabase.auth.admin.createUser({
-          phone: `+91${raw}`,
-          phone_confirm: true,
-          user_metadata: { full_name: params.full_name.trim() },
-        });
-        if (createdUser?.user) {
-          authUserId = createdUser.user.id;
-        }
-      }
-    } catch {}
-
-    record.id = authUserId;
-    saveCustomerToStore(record);
-
-    await supabase.from("profiles").upsert({
-      id: authUserId,
-      phone: formattedPhone,
-      full_name: params.full_name.trim(),
-      email: record.email,
-      role: "customer",
-      updated_at: nowIso,
-    });
-  } catch (err) {
-    console.warn("Supabase profile sync notice:", err);
-  }
-
   return record;
 }

@@ -50,6 +50,7 @@ function LoginContent() {
   const [otpInput, setOtpInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
+  const [detectedUser, setDetectedUser] = useState<{ isRegistered: boolean; name?: string | null } | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -84,21 +85,34 @@ function LoginContent() {
     setIsSubmitting(false);
 
     if (res.success) {
-      if (res.isRegistered === false) {
-        // New customer detected: align mode to registration
-        setAuthMode("signup");
-        setSuccessMessage("New customer detected! Please enter the OTP to create your account.");
-      } else if (res.isRegistered === true) {
-        // Existing customer detected: align mode to sign in
-        setAuthMode("login");
-        setSuccessMessage(
-          res.registeredName
-            ? `Welcome back, ${res.registeredName}! Enter OTP to sign in.`
-            : "Registered account detected! Enter OTP to sign in."
-        );
+      const isReg = Boolean(res.isRegistered);
+      const regName = res.registeredName || null;
+      setDetectedUser({ isRegistered: isReg, name: regName });
+
+      if (isReg) {
+        if (authMode === "signup") {
+          setSuccessMessage(
+            `Account Found! +91 ${cleaned} is already registered to ${regName || "you"}. Proceeding with Sign In.`
+          );
+        } else {
+          setSuccessMessage(
+            regName
+              ? `Welcome back, ${regName}! Enter OTP code to sign in.`
+              : "Registered account detected! Enter OTP to sign in."
+          );
+        }
       } else {
-        setSuccessMessage(res.message || "Verification code dispatched successfully!");
+        if (authMode === "login") {
+          setSuccessMessage(
+            `New Customer Detected: No existing account found for +91 ${cleaned}. Please enter OTP code to register your profile.`
+          );
+        } else {
+          setSuccessMessage(
+            `New account setup for +91 ${cleaned}! Enter OTP code to continue.`
+          );
+        }
       }
+
       setStep("otp");
       setTimer(30);
     } else {
@@ -330,19 +344,58 @@ function LoginContent() {
         <div className="text-center space-y-2">
           <div className="w-14 h-14 mx-auto rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37] shadow-inner mb-3">
             {step === "phone" && (authMode === "login" ? <Lock className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />)}
-            {step === "otp" && <Phone className="w-6 h-6" />}
+            {step === "otp" && (detectedUser?.isRegistered ? <ShieldCheck className="w-6 h-6 text-emerald-400" /> : <UserPlus className="w-6 h-6 text-[#d4af37]" />)}
             {step === "details" && <User className="w-6 h-6" />}
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[var(--text-main)]">
             {step === "phone" && (authMode === "login" ? "Sign In" : "Create Account")}
-            {step === "otp" && "Verify Mobile"}
-            {step === "details" && "Welcome to NEXORA"}
+            {step === "otp" && (detectedUser?.isRegistered ? "Sign In Verification" : "New Account Verification")}
+            {step === "details" && "Complete Your Profile"}
           </h1>
 
           {step === "otp" && (
+            <div className="space-y-2 pt-1 text-left">
+              {detectedUser?.isRegistered ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-white">Registered Account: {detectedUser.name || "Patron"}</div>
+                      <div className="text-[11px] text-emerald-300/80">Signing into existing profile (+91 {phoneInput})</div>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">Existing</span>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-white">New Mobile Number (+91 {phoneInput})</div>
+                      <div className="text-[11px] text-amber-300/80">Name required after OTP verification</div>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">New</span>
+                </div>
+              )}
+              <p className="text-[11px] text-[var(--text-sub)] text-center pt-1">
+                Enter the 6-digit code sent to +91 {phoneInput}. (Testing code:{" "}
+                <button
+                  type="button"
+                  onClick={() => setOtpInput("123456")}
+                  className="text-[#d4af37] font-mono font-bold underline cursor-pointer hover:text-amber-300"
+                >
+                  123456
+                </button>
+                )
+              </p>
+            </div>
+          )}
+
+          {step === "details" && (
             <p className="text-xs text-[var(--text-sub)] leading-relaxed">
-              Enter the 6-digit verification code sent to +91 {phoneInput}.
+              Mobile <strong className="text-[var(--text-main)] font-mono">+91 {phoneInput}</strong> verified. Please enter your full name to complete registration.
             </p>
           )}
         </div>
