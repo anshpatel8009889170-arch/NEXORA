@@ -65,8 +65,22 @@ interface AuthContextType {
   addSavedAddress: (address: Omit<SavedAddress, "id">) => SavedAddress;
   updateSavedAddress: (id: string, address: Partial<Omit<SavedAddress, "id">>) => void;
   deleteSavedAddress: (id: string) => void;
-  sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; mockOtp?: string; isRegistered?: boolean; registeredName?: string | null }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ success: boolean; message?: string; isNewUser?: boolean; userName?: string }>;
+  sendOtp: (
+    phone: string,
+    options?: { mode?: "login" | "signup"; name?: string; email?: string }
+  ) => Promise<{
+    success: boolean;
+    message?: string;
+    mockOtp?: string;
+    isRegistered?: boolean;
+    registeredName?: string | null;
+    code?: string;
+  }>;
+  verifyOtp: (
+    phone: string,
+    token: string,
+    details?: { name?: string; email?: string }
+  ) => Promise<{ success: boolean; message?: string; isNewUser?: boolean; userName?: string }>;
   updateProfileName: (fullName: string, email?: string) => Promise<{ success: boolean; message?: string }>;
   saveDeliveryAddress: (address: DeliveryAddressData) => Promise<void>;
   signOut: () => Promise<void>;
@@ -291,13 +305,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Send OTP to phone via Server API & Supabase Auth
   const sendOtp = async (
-    phoneNumber: string
+    phoneNumber: string,
+    options?: { mode?: "login" | "signup"; name?: string; email?: string }
   ): Promise<{
     success: boolean;
     message?: string;
     mockOtp?: string;
     isRegistered?: boolean;
     registeredName?: string | null;
+    code?: string;
   }> => {
     const cleaned = phoneNumber.replace(/\D/g, "");
     if (cleaned.length < 10) {
@@ -311,7 +327,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch("/api/auth/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: formattedPhone }),
+        body: JSON.stringify({
+          phone: formattedPhone,
+          mode: options?.mode,
+        }),
       });
 
       const data = await res.json();
@@ -328,20 +347,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return {
         success: false,
         message: data.error || "Failed to dispatch verification code.",
+        code: data.code,
+        isRegistered: data.isRegistered,
+        registeredName: data.registeredName,
       };
     } catch {
-      // Client-side fallback to Supabase SDK
-      try {
-        const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
-        if (!error) {
-          return { success: true, message: `OTP sent to ${formattedPhone}` };
-        }
-      } catch {}
-
       return {
-        success: true,
-        message: "Verification code generated! (Use demo code 123456)",
-        mockOtp: "123456",
+        success: false,
+        message: "Network error occurred. Please try again.",
       };
     }
   };
@@ -349,7 +362,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Verify OTP via Server API & Supabase Auth
   const verifyOtp = async (
     phoneNumber: string,
-    token: string
+    token: string,
+    details?: { name?: string; email?: string }
   ): Promise<{ success: boolean; message?: string; isNewUser?: boolean; userName?: string }> => {
     const cleaned = phoneNumber.replace(/\D/g, "");
     const formattedPhone = cleaned.length === 10 ? `+91${cleaned}` : `+${cleaned}`;
@@ -360,7 +374,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const verifyRes = await fetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: formattedPhone, token: cleanToken }),
+        body: JSON.stringify({
+          phone: formattedPhone,
+          token: cleanToken,
+          name: details?.name,
+          email: details?.email,
+        }),
       });
 
       const verifyData = await verifyRes.json();

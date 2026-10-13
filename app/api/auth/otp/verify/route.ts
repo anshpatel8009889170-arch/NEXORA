@@ -6,7 +6,7 @@ import {
   createCustomerSessionToken,
   setCustomerSessionCookie,
 } from "@/lib/security/customerAuth";
-import { findCustomerByPhone } from "@/lib/customersStore";
+import { findCustomerByPhone, upsertCustomerProfile } from "@/lib/customersStore";
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,8 +85,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Retrieve or initialize user profile in customer store
-    const customer = await findCustomerByPhone(formattedPhone);
+    // 4. Retrieve or initialize user profile in customer store / Supabase
+    let customer = await findCustomerByPhone(formattedPhone);
+
+    const incomingName = typeof body.name === "string" ? body.name.trim() : "";
+    const incomingEmail = typeof body.email === "string" ? body.email.trim() : undefined;
+
+    if (incomingName && incomingName !== "Guest" && incomingName !== "Royal Guest") {
+      customer = await upsertCustomerProfile({
+        id: verifiedUserId,
+        phone: formattedPhone,
+        full_name: incomingName,
+        email: incomingEmail,
+      });
+    }
 
     const hasRealName = Boolean(
       customer?.full_name &&
